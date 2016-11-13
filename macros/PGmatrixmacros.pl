@@ -247,13 +247,15 @@ sub display_matrix {
 	my $cnt = 1; # we count rows in in case an element is boxed
         # vertical lines put in with first row
         $j = shift @myRows;
+        my $tag = $opts{side_labels}->[$cnt-1];
         $out .= dm_mat_row($j, $alignList, %opts, 'isfirst'=>$numRows, 
-		'cnt' => $cnt);
-	$cnt++ unless ($j eq 'hline');
+		'cnt' => $cnt, 'tag'=>$tag);
+		$cnt++ unless ($j eq 'hline');
         $out .= dm_mat_right($numRows, %opts);
         for $j (@myRows) {
+        		$tag = $opts{side_labels}->[$cnt-1];
                 $out .= dm_mat_row($j, $alignList, %opts, 'isfirst'=>0,
-		'cnt' => $cnt);
+			'cnt' => $cnt,'tag'=>$tag);
 		$cnt++ unless ($j eq 'hline');
         }
         $out .= dm_end_matrix(%opts);
@@ -546,7 +548,11 @@ sub dm_mat_row {
 						$out .= '}' if ($colcount == $opts{'box'}->[1] and $opts{'cnt'} == $opts{'box'}->[0]);
                         $out .= " &";
                 }
-                chop($out); # remove last &
+                if ($opts{tag}) {
+                	$out.= $opts{tag};
+                } else {
+                	chop($out); # remove last &
+                }
                 $out .= "\\cr  \n";
                  # carriage returns must be added manually for tex
                 } elsif ( $main::displayMode eq 'HTML_MathJax'
