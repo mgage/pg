@@ -131,7 +131,7 @@ sub isRow {
 }
 
 #
-#  See if the matrix is an Indenity matrix
+#  See if the matrix is an Identity matrix
 #
 sub isOne {
   my $self = shift;
