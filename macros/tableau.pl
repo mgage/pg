@@ -6,6 +6,7 @@
 ##### From gage_matrix_ops
 # 2014_HKUST_demo/templates/setSequentialWordProblem/bill_and_steve.pg:"gage_matrix_ops.pl",
 
+<<<<<<< HEAD
 =head1 Tableaus and matrices
 
  # We're going to have several types
@@ -156,6 +157,25 @@ This represents the current version of the tableau
 		Return: MathObject matrix
 		
 
+=======
+=head3   Matrix extraction mechanisms
+
+	matrix_column_slice   (was matrix_from_matrix_cols)
+	
+	matrix_row_slice      (was matrix_from_matrix_rows)
+
+	matrix_extract_submatrix (was matrix_from_submatrix)
+	
+	matrix_extract_rows
+	
+	matrix_extract_columns
+	
+	matrix_columns_to_List
+	
+	matrix_rows_to_List
+	
+Many of these duplicate methods of Value::Matrix  -- refactor. 
+>>>>>>> develop_plus_tableau
 =cut 
 
 
@@ -250,7 +270,11 @@ sub matrix_extract_columns {
 # Calculates the values of the basis variables of the tableau, 
 # assuming the parameter variables are 0.
 #
+<<<<<<< HEAD
 # Usage:   ARRAY = get_tableau_variable_values($MathObjectMatrix_tableau, $MathObjectSet_basis)
+=======
+# Usage:   get_tableau_variable_values($MathObjectMatrix_tableau, $MathObjectSet_basis)
+>>>>>>> develop_plus_tableau
 # 
 # feature request -- for tableau object -- allow specification of non-zero parameter variables
 sub get_tableau_variable_values {
@@ -264,15 +288,25 @@ sub get_tableau_variable_values {
    #DEBUG_MESSAGE( "start new matrix");
    foreach my $j (1..$m-2) {    # the last two columns of the tableau are object variable and constants
       if (not $basis->contains($j)) {
+<<<<<<< HEAD
             DEBUG_MESSAGE( "j= $j not in basis");  # set the parameter values to zero
+=======
+            #DEBUG_MESSAGE( "j= $j not in basis");
+>>>>>>> develop_plus_tableau
             $var[$j-1]=0; next; # non-basis variables (parameters) are set to 0. 
             
       } else {
             foreach my $i (1..$n-1) {  # the last row is the objective function
                # if this is a basis column there should be only one non-zero element(the pivot)
+<<<<<<< HEAD
                if ( $mat->element($i,$j)->value != 0 ) { # should this have ->value?????
                   $var[$j-1] = ($mat->element($i,$m)/($mat->element($i,$j))->value);                  
                   DEBUG_MESSAGE("i=$i j=$j var = $var[$j-1] "); # calculate basis variable value
+=======
+               if ( not $mat->element($i,$j) == 0 ) { # should this have ->value?????
+                  $var[$j-1] = ($mat->element($i,$m)/$mat->element($i,$j))->value;                  
+                  #DEBUG_MESSAGE("i=$i j=$j var = $var[$j-1] ");
+>>>>>>> develop_plus_tableau
                   next;
                }
              
@@ -282,7 +316,11 @@ sub get_tableau_variable_values {
                        # this last variable is the value of the objective function
   push @var , ($mat->element($n,$m)/$mat->element($n,$m-1))->value;
 
+<<<<<<< HEAD
   return wantarray ? @var : \@var;
+=======
+     @var;
+>>>>>>> develop_plus_tableau
 }
 #### Test -- assume matrix is this 
 #    	1	2	1	0	0 |	0 |	3
@@ -302,16 +340,24 @@ sub get_tableau_variable_values {
 sub lp_basis_pivot {
 	my ($old_tableau,$old_basis,$pivot) = @_;  # $pivot is a Value::Point
 	my $new_tableau= lp_clone($old_tableau);
+<<<<<<< HEAD
 	# lp_pivot has 0 based indices
 	main::lp_pivot($new_tableau, $pivot->extract(1)-1,$pivot->extract(2)-1);
 	# lp_pivot pivots in place	
+=======
+	main::lp_pivot($new_tableau, $pivot->extract(1)-1,$pivot->extract(2)-1);	
+>>>>>>> develop_plus_tableau
 	my $new_matrix = Matrix($new_tableau);
 	my ($n,$m) = $new_matrix->dimensions;
 	my $param_size = $m-$n -1;	#n=constraints+1, #m = $param_size + $constraints +2
 	my $new_basis = ( $old_basis - ($pivot->extract(1)+$param_size) + ($pivot->extract(2)) )->sort;
 	my @statevars = get_tableau_variable_values($new_matrix, $new_basis);
+<<<<<<< HEAD
 	return ( $new_tableau, Set($new_basis),\@statevars); 
 	# force to set (from type Union) to insure that ->data is an array and not a string.
+=======
+	return ( $new_tableau, Set($new_basis),\@statevars); #FIXME -- force to set (from type Union) to insure that ->data is an array and not a string.
+>>>>>>> develop_plus_tableau
 }
 
  
@@ -336,16 +382,44 @@ sub linebreak_at_commas {
 # );
 
 
+<<<<<<< HEAD
 ### End gage_matrix_ops include 
 
 
 
+=======
+# We're going to have several types
+# MathObject Matrices  Value::Matrix
+# tableaus form John Jones macros
+# MathObject tableaus
+#   Containing   an  matrix $A  coefficients for constraint
+#   A vertical vector $b for constants for constraints
+#   A horizontal vector $c for coefficients for objective function
+#   A vertical vector  $P for the value of the objective function
+#   dimensions $n problem vectors, $m constraints = $m slack variables
+#   A basis Value::Set -- positions for columns which are independent and 
+#      whose associated variables can be determined
+#      uniquely from the parameter variables.  
+#      The non-basis (parameter) variables are set to zero. 
+#
+#  state variables (assuming parameter variables are zero or when given parameter variables)
+# create the methods for updating the various containers
+# create the method for printing the tableau with all its decorations 
+# possibly with switches to turn the decorations on and off. 
+
+
+### End gage_matrix_ops include 
+>>>>>>> develop_plus_tableau
 ##################################################
 package Tableau;
 our @ISA = qw(Value::Matrix Value);
 
+<<<<<<< HEAD
 sub _Matrix {   # can we just import this?
                 # this is a function, not a method
+=======
+sub _Matrix {    # can we just import this?
+>>>>>>> develop_plus_tableau
 	Value::Matrix->new(@_);
 }
 
@@ -363,7 +437,7 @@ sub new {
 		S => undef, # square m by m matrix for slack variables
 		basis => undef, # list describing the current basis columns corresponding to determined variables.
 		B => undef,  # square invertible matrix corresponding to the current basis columns
-		M => undef,  # matrix of consisting of all columns and all rows except for the objective function row and column
+		M => undef,  # matrix of consisting of all columns and all rows except for the objective function row
 		obj_col_num => undef, # flag indicating the column (1 or n+m+1) for the objective value
 		constraint_labels => undef,
 		problem_var_labels => undef, 
@@ -375,10 +449,12 @@ sub new {
 	return $tableau;
 }
 
+
 # the following are used to construct the tableau
 # initialize
 # assemble_matrix
 # objective_row
+
 sub initialize {
 	$self= shift;
 	unless (ref($self->{A}) =~ /Value::Matrix/ &&
