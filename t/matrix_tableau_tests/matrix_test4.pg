@@ -1,0 +1,78 @@
+##############################################
+DOCUMENT();
+
+loadMacros(
+   "PGstandard.pl",     # Standard macros for PG language
+   "MathObjects.pl",
+   "parserLinearInequality.pl",
+   "PGML.pl",
+   "quickMatrixEntry.pl",
+   "tableau.pl",
+   "PGmatrixmacros.pl",
+   "LinearProgramming.pl",
+    #"source.pl",        # allows code to be displayed on certain sites.
+   "PGcourse.pl",
+);
+
+##############################################
+
+Context("Matrix");  # need Matrix context to allow string input into Matrix.
+$zeroLevelTol = 1E-03;
+$zeroLevel    = 1E-03;
+$tolType      = 'relative'; # "absolute"; #relative
+$tolerance    = .001;   
+
+Context("Matrix");
+
+Context()->flags->set(
+	tolType => $tolType,
+	tolerance =>$tolerance,
+	zeroLevel=>$zeroLevel,
+	zeroLevelTol=>$zeroLevelTol
+); 
+
+
+BEGIN_PGML
+Test to see if the tolerance flags are being respected
+when inserted into answer checkers  
+zeroLevelTol = [$zeroLevelTol]      
+zeroLevel    = [$zeroLevel]  
+tolType      = [$tolType]       
+tolerance    = [$tolerance]      
+END_PGML
+
+#Construct a small test matrix.
+
+$m = Matrix("[[3,6,7],[2,0,8],[4,6,21],[-6,4,0]]");
+$m2 = Matrix("[[3,6,7],[1.9999,.0001,8],[4,6,21],[-6,4,1E-5]]");
+
+BEGIN_PGML
+m is [$m]    
+and m2 is [$m2]
+
+Enter [$m2]  
+[@MATRIX_ENTRY_BUTTON($m2)@]*
+[@ ANS($m2->cmp), $m2->ans_array(15) @]*
+
+
+Are these tolerance leveals  being ignored? 
+m and m2 are equal = [@ $m == $m2 @]
+
+END_PGML
+
+BEGIN_TEXT
+This is in the BEGIN_TEXT/END_TEXT section: $BR
+
+m is $m $BR    
+and m2 is $m2 $BR
+
+Enter $m  
+\{ MATRIX_ENTRY_BUTTON($m) \}
+\{  ANS($m->cmp), $m->ans_array \}
+$PAR
+Are these tolerance levels are being ignored? 
+m and m2 are equal = \{ $m == $m2 \}
+
+END_TEXT
+
+ENDDOCUMENT();
