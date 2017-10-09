@@ -6,8 +6,13 @@
 ##### From gage_matrix_ops
 # 2014_HKUST_demo/templates/setSequentialWordProblem/bill_and_steve.pg:"gage_matrix_ops.pl",
 
+=head1 NAME
 
-=head1 Tableaus and matrices
+	macros/tableau.pl
+	
+	
+
+=head2 DESCRIPTION
 
  # We're going to have several types
  # MathObject Matrices  Value::Matrix
@@ -157,6 +162,16 @@ This represents the current version of the tableau
 		Return: MathObject matrix
 		
 =cut 
+
+=head3 References:
+
+MathObject Matrix methods: L<http://webwork.maa.org/wiki/Matrix_(MathObject_Class)>
+MathObject Contexts: L<http://webwork.maa.org/wiki/Common_Contexts>
+CPAN RealMatrix docs: L<http://search.cpan.org/~leto/Math-MatrixReal-2.09/lib/Math/MatrixReal.pm>
+
+More references: L<lib/Matrix.pm>
+
+=cut
 
 
 sub _tableau_init {};   # don't reload this file

@@ -4,13 +4,15 @@
 
 =head1 NAME
 
-        Matrix macros for the PG language
+		PGmatrixmacros.pl
 
 =head1 SYNPOSIS
 
 
 
 =head1 DESCRIPTION
+
+Matrix macros for the PG language
 
 These macros are fairly old. The most useful is display_matrix and
 its variants.

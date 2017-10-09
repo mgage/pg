@@ -4,7 +4,9 @@
 #
 #    @@@ Still needs lots of work @@@
 
-=head1 Value::Matrix class
+=head1 NAME 
+
+	Value::Matrix class
 
 
 References:

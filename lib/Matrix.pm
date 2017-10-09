@@ -1,6 +1,9 @@
 =head1 NAME
 
-Matrix - Matrix of Reals
+lib/Matrix - Matrix of Reals
+
+
+=head1 DESCRIPTION
 
 Implements overrides for MatrixReal.pm for WeBWorK
 In general it is better to use MathObjects Matrices (Value::Matrix)
@@ -9,9 +12,6 @@ error messages for syntax errors in student entries.  Some of the
 subroutines in this file are still used behind the scenes 
 by Value::Matrix to perform calculations,
 such as decompose_LR(). 
-
-=head1 DESCRIPTION
-
 
 
 =head1 SYNOPSIS
@@ -87,6 +87,9 @@ sub _stringify {
 Original matrix is  P_L * L * R *P_R
 # obtain the Left Right matrices of the decomposition and the two pivot permutation matrices
 # the original is M = PL*L*R*PR
+
+=cut 
+
 sub L {
 	my $matrix = shift;
 	my $rows = $matrix->[1];
@@ -138,7 +141,7 @@ sub PR { # use this permuation on the right PL*L*R*PR =M
 # the original is M = PL*L*R*PR
 
 
-=head4
+=item	rh_options
 
 	Method $matrix->rh_options
 
@@ -153,14 +156,14 @@ sub rh_options {
 	$self->[$MatrixReal1::OPTION_ENTRY];     # provides a reference to the options hash MEG
 }
 
-=head4
 
-	Method $matrix->trace
-	
+=item	trace
+
+	Method: $matrix->trace
 	Returns: scalar which is the trace of the matrix.
 	
-	Used by MathObject Matrices for calculating the trace. 
-	Deprecated for direct use in PG questions.
+Used by MathObject Matrices for calculating the trace. 
+Deprecated for direct use in PG questions.
 
 =cut
 
@@ -178,11 +181,11 @@ sub trace {
 }
 
 
-=head4
+=item new_from_array_ref
 
 	Method    $new_matrix = $matrix->new_from_array_ref ([[a,b,c],[d,e,f]])
 	
-	Deprecated in favor of using creation tools for MathObject Matrices 
+Deprecated in favor of using creation tools for MathObject Matrices 
 
 =cut
 
@@ -196,7 +199,7 @@ sub new_from_array_ref {  # this will build a matrix or a row vector from  [a, b
 	$matrix;
 }
 
-=head4
+=item array_ref
 
 	Method $matrix->array_ref
 
@@ -209,7 +212,7 @@ sub array_ref {
 	$this->[0];
 }
 
-=head4
+=item list
 
 	Method $matrix->list
 
@@ -229,11 +232,11 @@ sub list {           # this is used only for column vectors
 }
 
 
-=head4
+=item new_row_matrix
 
 	Method $matrix->new_row_matrix
 	
-	Deprecated -- there are better tools for MathObject Matrices.
+Deprecated -- there are better tools for MathObject Matrices.
 
 Create a row 1 by n matrix from a list.  This subroutine appears to be broken
 
@@ -253,7 +256,7 @@ sub new_row_matrix {   # this builds a row vector from an array
 	$matrix;
 }
 
-=head4
+=item proj
 
 	Method $matrix->proj
 	Provides behind the scenes calculations for MathObject Matrix->proj
@@ -267,11 +270,12 @@ sub proj{
 	$self * $self ->proj_coeff($vec);
 }
 
-=head4
+=item proj_coeff
 
 	Method $matrix->proj_coeff
-	Provides behind the scenes calculations for MathObject Matrix->proj_coeff
-	Deprecated for direct use in favor of methods of MathObject matrix
+	
+Provides behind the scenes calculations for MathObject Matrix->proj_coeff
+Deprecated for direct use in favor of methods of MathObject matrix
 
 =cut
 
@@ -288,11 +292,11 @@ sub proj_coeff{
 	$x_vector;
 }
 
-=head4
+=item new_column_matrix
 
 	Method $matrix->new_column_matrix
 
-	Create column matrix from an ARRAY reference (list reference)
+Create column matrix from an ARRAY reference (list reference)
 	
 =cut
 
@@ -309,15 +313,15 @@ sub new_column_matrix {
 	$matrix;
 }
 
-=head4
-
-	This method takes an array of column vectors, or an array of arrays,
-	and converts them to a matrix where each column is one of the previous
-	vectors.
+=item new_from_col_vecs
 	
 	Method $matrix->new_from_col_vecs
 	
-	Deprecated: The tools for creating MathObjects Matrices are simpler
+Deprecated: The tools for creating MathObjects Matrices are simpler.
+This method takes an array of column vectors, or an array of arrays,
+and converts them to a matrix where each column is one of the previous
+vectors.
+
 
 =cut
 
@@ -366,10 +370,12 @@ sub new_from_col_vecs
 	
 =cut
 
-=head4
+=item cp
 
 	Function: cp()
-	Provides ability to use complex numbers.
+	
+Provides ability to use perl complex numbers. N
+
 =cut
 
 sub cp  { # MEG  makes new copies of complex number
@@ -379,7 +385,7 @@ sub cp  { # MEG  makes new copies of complex number
 	return $w;
 }
 
-=head4
+=item copy
 
 	Method $matrix->copy
 
@@ -422,7 +428,7 @@ sub copy
 
 # MEG added 6/25/03 to accomodate complex entries
 
-=head4
+=item conj
 
 	Method $matrix->conj
 
@@ -434,7 +440,7 @@ sub conj {
     $elem;
 }
 
-=head4
+=item transpose
 
 	Method $matrix->transpose
 
@@ -483,12 +489,13 @@ sub transpose
     $matrix1;
 }
 
-=head4
+=item decompose_LR
 
 	Method $matrix->decompose_LR
 
-	Used by MathObjects Matrix for LR decomposition
-	Deprecated for direct use in PG problems. 
+Used by MathObjects Matrix for LR decomposition
+Deprecated for direct use in PG problems. 
+
 =cut
 
 sub decompose_LR
