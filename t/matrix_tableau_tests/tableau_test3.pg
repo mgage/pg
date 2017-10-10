@@ -1,0 +1,826 @@
+DOCUMENT();  
+loadMacros(
+"PGstandard.pl",
+"MathObjects.pl",
+"parserPopUp.pl",
+"unionLists.pl",
+"MatrixReduce.pl",
+#"AppletObjects.pl",
+"PGessaymacros.pl",
+"PGmatrixmacros.pl",
+"LinearProgramming.pl",
+"parserLinearInequality.pl",
+"quickMatrixEntry.pl",
+#"scaffold.pl",
+"tableau.pl",
+#"gage_matrix_ops.pl",
+"PGinfo.pl",
+"source.pl",
+"PGcourse.pl",
+);
+
+TEXT(beginproblem());
+TEXT($BEGIN_ONE_COLUMN);
+$showPartialCorrectAnswers = 1;
+
+INITIALIZE_QUICK_MATRIX_ENTRY();
+
+
+##############################################################
+# problem data
+##############################################################
+
+# this can be changed (slightly at least) without affecting the behavior of the problem
+# The choice of pivots is not yet automatic However
+
+# Your resources:
+$money_total = 6000;
+$time_total  = 600;
+
+# Bill
+$bill_money_commitment = 5000; #dollars
+$bill_time_commitment  = 400;  # hours
+$bill_profit = 4700;
+# Steve
+$steve_money_commitment = 3000;
+$steve_time_commitment  = 500;
+$steve_profit = 4500;
+
+#Hack to prevent domain conflict in answer.
+Context()->variables->add(p1=>'Real',p2=>'Real');
+$objfun1 = Formula("${bill_profit}p1 + ${steve_profit}p2");
+# why can't the formula be defined within context "linearInequality"?
+
+Context("LinearInequality");
+Context()->variables->add(p1=>'Real',p2=>'Real');
+Context()->strings->add("Essay Answer" =>{});
+Context()->strings->add('Minimize'=>{},'Maximize'=>{}, "?"=>{});
+Context()->strings->add('Yes'=>{},'No'=>{});
+Context()->flags->set({tolType=>"absolute",tolerance=>.001});
+Context()->flags->set(
+	zeroLevel=>0.001,
+	zeroLevelTol=>.001
+);
+# $objfun1 = Formula("${bill_profit}p1 + ${steve_profit}p2");
+
+our $context=Context();
+
+##############################################################
+#
+#  Setup
+#
+#
+
+
+
+$original_matrix = Matrix([
+	[$bill_money_commitment, $steve_money_commitment, 1, 0, 0,0,0, $money_total],
+	[$bill_time_commitment,$steve_time_commitment, 0, 1, 0,0,0, $time_total],
+	[1,0,0,0,1,0,0,1],
+	[0,1,0,0,0,1,0,1],
+	[-$bill_profit, -$steve_profit, 0, 0, 0,0,1, 0]
+	]
+);
+$toplabels = [qw(p1 p2 x3 x4 x5 x6 P b)];
+$sidelabels = [' ', qw(\text{cash} \text{hours} \text{p_1_bound} \text{p_2_bound} \text{obj_func}) ];
+$matrix1 = $original_matrix;
+
+##############################################################################
+# utility subroutine for checking your answers
+##############################################################################
+
+# size of constraint matrix with slack variables, objective column and constant column
+$row_size =4;         # n-1   n is constraints + objective_row
+$param_size=2;        # original number of parameters in the problem
+$col_size = $param_size+$row_size+2; # m paramvars+slackvars+objcol+constant_col
+# the full tableau has one more row -- the objective function
+sub display_tableau_state {
+	my ($original_matrix,$tableau, $matrix, $basis,$pivot)= @_;
+	$basis = $basis->sort;
+	my $basis_size = @{$basis->data} ;
+	my $basis_matrix = matrix_from_submatrix($original_matrix, rows=>[1..$basis_size],columns=>$basis->data);
+	my $normalized_tableau = $matrix;
+	my $reduced_matrix = matrix_from_matrix_rows($matrix,1..$basis_size);
+	
+	my $normalized_reduced_matrix = ($basis_matrix->det)*$reduced_matrix;
+	# calculate current tableau by multiplying by the inverse of the basis
+	my $obj_coeff = - $original_matrix->row($basis_size+1);
+	my $cB = Matrix($obj_coeff->column_slice($basis->data));
+	my $current_matrix = ($basis_matrix->det)*($basis_matrix->inverse)*matrix_from_matrix_rows($original_matrix,1..$basis_size);
+	my $new_obj_row = ($cB*$current_matrix)->row(1) - ($basis_matrix->det)*($obj_coeff);
+	my $current_tableau = Matrix(@{$current_matrix->extract_rows},Matrix($new_obj_row));
+	
+	@statevars1 = get_tableau_variable_values($matrix, $basis);
+	# get z value
+	$statevars1 = ~~@statevars1;
+	$state = Matrix([[@statevars1]]);
+
+# 	return "
+# 	<font size='-2'>
+# 	pivot: \($pivot\) basis: \( $basis\)  basis matrix \(".
+# 	display_matrix_mm($basis_matrix)."\) $PAR
+# 	tableau and normalized current tableau   $PAR
+# 	 \(" . lp_display_mm($tableau) . "\)\(".lp_display_mm($normalized_tableau). " \) $PAR 
+# 	original matrix and current matrix calculated by Binverse*original $PAR
+# 	\(".
+# 	display_matrix_mm(matrix_from_matrix_rows($original_matrix,1..$basis_size)).
+# 	"\)  \(".
+# 	display_matrix_mm($current_matrix).
+# 	"\)  $PAR
+# 	objective coefficients = \( $obj_coeff \) $PAR
+# 	basis objective_coefficients = \($cB\) $BR
+# 	current matrix rows \(".
+# 	join(" ", @{$current_matrix->extract_rows}).
+# 	"\)$PAR
+# 	new objective row cB * B^-1 * M -c= \($new_obj_row\)$PAR
+# 	new tableau \[".
+# 	lp_display_mm($current_tableau).
+# 	"\]  $PAR
+# 	state:  \(" . join(", ", @$state) . "\)  $PAR
+# 	</font>"
+	return "
+	<font size='-2'>
+	pivot: \($pivot\) basis: \( $basis\) $PAR  basis matrix \(".
+	display_matrix_mm($basis_matrix)."\) $PAR
+	tableau and normalized current tableau   $PAR
+	 \(" . lp_display_mm($tableau) . "\)\(".lp_display_mm($normalized_tableau). " \) $PAR 
+	original matrix and current matrix calculated by Binverse*original $PAR
+	\(".
+	display_matrix_mm(matrix_from_matrix_rows($original_matrix,1..$basis_size)).
+	"\)  \(".
+	display_matrix_mm($current_matrix).
+	"\)  $PAR
+	objective coefficients = \( $obj_coeff \) $PAR
+	basis objective_coefficients = \($cB\) $PAR
+	new tableau \[".
+	lp_display_mm($current_tableau).
+	"\]  $PAR
+	state:  \($state)\)  $PAR
+	</font>"
+}
+
+# here is the outline of the worksheet project
+# BEGIN_TEXT
+# \{BeginList("OL")\}
+# $ITEM Set up problem
+# $ITEM Write tableau
+# $ITEM Solve using simplex method
+# $ITEM Create dual problem
+# $ITEM Write tableau for dual problem
+# $ITEM Set up LOP for auxiliary method to find feasible solution
+# $ITEM Solve the auxiliary problem to find a feasible basic solution.
+# $ITEM Finish solving the dual problem using simplex method
+# $ITEM Compare answers to the primary problem and the dual problem.
+# \{EndList("OL")\}
+# 
+# END_TEXT
+
+
+#########################
+# start sections
+#########################
+
+
+
+#########################################################################################################
+#  Section 1
+#  section 1 (1essay)
+#########################################################################################################
+Context($context);
+$constraint1 = Compute("${bill_money_commitment}p1 + ${steve_money_commitment}p2 <= $money_total");
+$constraint2 = Compute("${bill_time_commitment}p1 + ${steve_time_commitment}p2 <= $time_total");
+$constraint3 = Compute("p1<=1");
+$constraint4 = Compute("p2<=1");
+$constraints = List( $constraint1, $constraint2, $constraint3, $constraint4 );
+$popup1 = PopUp([qw(? Maximize Minimize)],'Maximize');
+Context($context);
+# defined above? wtf? # $objfun1 = Formula("${bill_profit}p1 + ${steve_profit}p2");
+Context()->texStrings;
+
+BEGIN_TEXT
+$PAR  This is the same as an earlier problem but the numbers have 
+been changed slightly.  How does this change the result?
+$HR $PAR 1.$PAR
+You have $DOLLAR$money_total to invest. $PAR 
+Two of your friends, Bill and Steve,  have offered you an opportunity to become 
+a partner in two different entrepreneurial ventures, one planned by each friend.  In both cases, this
+investment would involve expending some of your time next summer as well as putting up cash.  
+$PAR Becoming
+a full partner in Bill's venture will require an investment of $DOLLAR$bill_money_commitment
+ and $bill_time_commitment  hours and your estimated profit
+at the end of the summer (ignoring  the value of your time) would be 
+$DOLLAR$bill_profit (plus your investment money back).  
+$PAR 
+The corresponding figures for Steve's venture are
+$DOLLAR$steve_money_commitment and  $steve_time_commitment hours with an estimated profit of $DOLLAR$steve_profit.  
+Both friends are flexible and would
+allow you to come in at any fraction of a full partnership you would like.  If you choose a fraction
+of a full partnership, all the above figures given for a full partnership (money investment, 
+time investment, and your profit) would be multiplied by this same fraction.
+$PAR
+Because you were looking for an interesting summer job anyway (maximum of $time_total hours), you have decided to participate in 
+one or both friends' ventures in whichever combination would maximize your total estimated profit.
+$PAR
+Write a linear program to help you determine the correct fractions. Use p1 for the fraction of 
+a full partnership with Bill and p2 for the fraction of a full partnership with Steve.  These
+fractions should each be less than or equal to one but don't have to sum to one. If you had enough money and
+time you could invest fully in both ventures.
+$PAR
+
+\{ANS($popup1->cmp), $popup1->menu\} the profit 
+
+\(P = \)\{Context($context),ANS($objfun1->cmp), ans_rule(40)\} 
+
+$PAR subject to the following constraints. Separate the constraints by commas.
+
+\{  ANS($constraints->cmp->withPostFilter(
+	linebreak_at_commas()
+)), ans_box(10,80) \}
+$PAR
+END_TEXT
+
+
+BEGIN_TEXT
+
+SOLUTION $PAR
+
+\(p_1\) is the fraction to invest in Bill's venture.
+\(p_2 = \) fraction of Steve's venture to invest in. 
+$PAR
+
+Maximize \(P = $objfun1\) subject to the constraints:
+ $PAR
+\[
+\begin{aligned}
+$constraint1 & \\
+$constraint2 & \\
+$constraint3 & \\
+$constraint4 & \\
+\end{aligned}
+\]
+
+END_TEXT
+
+#########################################################################################################
+# Section 2 -- set up tableau
+#########################################################################################################
+# get information on current state
+$tableau1 = $matrix1->wwMatrix->array_ref; # translate to the array reference
+$basis1 = Set(3,4,5,6);
+@statevars1 = get_tableau_variable_values($matrix1, $basis1);
+# get z value
+$statevars1 = ~~@statevars1;
+$state1 = Matrix([[@statevars1]]);
+
+$matrix1->{top_labels}=$toplabels;
+Context()->texStrings;
+
+BEGIN_TEXT
+
+Write the matrix/tableau representing the linear optimization problem above.  Use 
+the convention that the objective function is listed on the bottom row and the coefficient in
+front of the profit \(P\) is \(1\) or equivalently in the form \( -ax_1 -bx_2 +z = 0 \)
+$PAR
+We'll use x3 for the slack variable for the money constraint, x4 for  the time constraint 
+slack variable and x5 and x6 for the slack variables for the contraints on  p1 and p2.
+$PAR
+\{MATRIX_ENTRY_BUTTON($matrix1)\}
+$PAR
+\{ANS($matrix1->cmp), $matrix1->ans_array()\}
+$PAR
+END_TEXT
+
+BEGIN_TEXT
+SOLUTION:$PAR
+
+\[ \{lp_display_mm($matrix1, top_labels=>$toplabels).side_labels($sidelabels)\} \] 
+
+$PAR
+First display of state 1
+$PAR
+\{display_tableau_state($original_matrix,$tableau1, $matrix1, $basis1, $pivot)\}
+$PAR
+END_TEXT
+
+
+Context()->normalStrings;
+
+#########################################################################################################
+# Section 3 --  pivots
+#########################################################################################################
+
+# #########################################################################################################
+# # first pivot
+# #########################################################################################################
+# 
+# Context($context);
+$pivot1 = Point("(3,1)");
+# the new basis vectors are [1,3,4,6] <- [3,4,5,6]
+($tableau2,$basis2, $statevars2) = lp_basis_pivot($tableau1,$basis1,$pivot1);
+ $B2 = matrix_extract_submatrix($original_matrix,rows=>[1..$row_size],columns=>$basis2->data);
+#  BEGIN_TEXT
+#  tableau2 = $tableau2 $BR
+#  basis2 = $basis2 $BR
+#  statevars2 = $statevars2 $BR
+#  original_matrix = $original_matrix $BR
+#  B2 = $B2 $BR
+#  row data:\{ join(" ", @{[1..$row_size]})\} $BR
+#  basis data (columns: \{join(" ", @{ $basis2->data })\} $BR
+#  END_TEXT
+$matrix2 = ($B2->det)*Matrix($tableau2);
+$matrix2->{top_labels}=$toplabels;
+$state2=Matrix([[@$statevars2]]);
+
+
+BEGIN_TEXT
+SOLUTION:$PAR
+
+\[   \{lp_display_mm($matrix2, top_labels=>($matrix2->{top_labels})).side_labels($sidelabels)\} \] 
+
+$PAR
+Display of state 2 $PAR
+\{display_tableau_state($original_matrix,$tableau2, $matrix2, $basis2,  $pivot1)\} 
+
+END_TEXT
+
+# BEGIN_TEXT
+# 
+# Some experiments
+# extract rows
+# \{ @temp = @{$matrix2->extract_rows} \}
+# \{pop @temp \}
+# $PAR
+# first element \{ref($temp[0])\}
+# $PAR
+# \{ join(" ", @temp, Matrix([1,2,3,4,5,6,7,8])) \}$PAR
+# 
+# \{$temp2 = Matrix(@temp, Matrix([1,2,3,4,5,6,7,8])) \}
+# $PAR
+# new matrix is \[   \{lp_display_mm($temp2, top_labels=>$toplabels).side_labels($sidelabels)\} \] 
+# 
+# 
+# END_TEXT
+# #########################################################################################################
+# # second pivot
+# #########################################################################################################
+$pivot2 = Point("(1,2)");
+# the new basis vectors are [1,2,4,6] <- [1,3,4,6]
+($tableau3,$basis3, $statevars3) = lp_basis_pivot($tableau2,$basis2,$pivot2);
+$B3 = matrix_from_submatrix($original_matrix,rows=>[1..$row_size],columns=>$basis3->data);
+$matrix3 = ($B3->det)*Matrix($tableau3);
+$matrix3->{top_labels}=$toplabels;
+$state3=Matrix([[@$statevars3]]);
+
+#########################################################################################################
+# third pivot
+#########################################################################################################
+$pivot3 = Point("(2,5)");
+# the new basis vectors are [1,2,5,6] <- [1,2,4,6]
+($tableau4,$basis4, $statevars4) = lp_basis_pivot($tableau3,$basis3,$pivot3);
+$B4 = matrix_from_submatrix($original_matrix,rows=>[1..$row_size],columns=>$basis4->data);
+$matrix4 = ($B4->det)*Matrix($tableau4);
+$matrix4->{top_labels}=$toplabels;
+$state4=Matrix([[@$statevars4]]);
+
+$p1 = $state4->element(1,1);
+$p2 = $state4->element(1,2);
+$profit = $state4->element(1,7);
+
+#########################################################################################################
+# debugging display code
+#########################################################################################################
+BEGIN_TEXT
+pivot1 $pivot1 $PAR
+\{display_tableau_state($original_matrix,$tableau2, $matrix2,  $basis2,   $pivot1)\} 
+pivot2 $pivot2 $PAR
+\{display_tableau_state($original_matrix,$tableau3, $matrix3,  $basis3,   $pivot2)\} 
+pivot3 $pivot3 $PAR
+\{display_tableau_state($original_matrix,$tableau4, $matrix4,  $basis4,   $pivot3)\} 
+END_TEXT
+# # 
+# # 
+# # #########################################################################################################
+# # # section 3 answers (3,4,5,6,7,8, 9, 10)
+# # #########################################################################################################
+# Context()->texStrings;
+# 
+# BEGIN_TEXT
+# $PAR
+# What is the initial state? $PAR 
+#  \((p_1,p_2,x_3,x_4,x_5,x_6,P)=\): \{ANS($state1->cmp),$state1->ans_array(4)\} $PAR
+# 
+# Using the convention that one removes the "first" nonbasic column that will increase profits
+# (the convention that Hurlbert uses) find the first pivot location. (e.g. (2,3) for line 2, column 3).
+# and perform the pivot operation.  (You can use 
+# \{htmlLink("http://people.vcu.edu/~ghurlbert/websim/sim.html","websim")\} to do the calculation.     );
+# $PAR
+# 
+# Pivot entry: use parentheses as in (row, column): \{ANS($pivot1->cmp),$pivot1->ans_rule \}.
+# $PAR
+# The matrix has been multiplied by a constant so that all values are integers. This is
+# the same result as you will obtain using websim.
+# $PAR
+# \{MATRIX_ENTRY_BUTTON($matrix2)\}
+# $PAR 
+# $PAR   
+# \{ANS($matrix2->cmp()), $matrix2->ans_array(6)\}
+# 
+# $PAR
+# Current vector (values): \{ANS($state2->cmp),$state2->ans_array(6)\} $PAR
+# $HR
+# Next pivot entry: \{ANS($pivot2->cmp),$pivot2->ans_rule \}.
+# 
+# $PAR
+# \{MATRIX_ENTRY_BUTTON($matrix3)\}
+# $PAR  
+# \{ANS($matrix3->cmp()), $matrix3->ans_array(6)\}
+# $HR
+# Next pivot entry: \{ANS($pivot3->cmp),$pivot3->ans_rule \}
+# results in the tableau: 
+# $PAR
+# \{MATRIX_ENTRY_BUTTON($matrix4)\}
+# $PAR $PAR
+# \{ANS($matrix4->cmp()), $matrix4->ans_array(6)\}
+# $HR
+# At this point we are at a local (and therefore a global) maximum and pivoting
+# will not increase the profit.
+# $PAR
+# Your final state is \{ANS($state4->cmp),$state4->ans_array(6)\} $PAR
+# (Make sure you are getting all the zeros in the answer! The numbers are quite large
+# and overflow the blanks. -- you can make the table blanks wider
+# in websim by right clicking on upper left corner of a table. )
+# 
+# $PAR What percentage of Bill's venture do you invest in?  
+# \{ANS($p1->cmp), $p1->ans_rule\}
+# $PAR What percentage of Steve's venture do you invest in?  
+# \{ANS($p2->cmp), $p2->ans_rule\}
+# $PAR What is your expected profit? 
+# $DOLLAR\{ANS($profit->cmp),$profit->ans_rule\}.
+# 
+# 
+# $PAR
+# 
+# END_TEXT
+# 
+# BEGIN_SOLUTION
+# Before pivoting the state is \($state1\) $PAR
+# Your first pivot should be on \($pivot1\) since that is the left most 
+# column that
+# will increase the profit and the first row has the most limiting ratio.
+# $PAR
+# \( \{lp_display_mm( [$matrix2->value],top_labels=>$toplabels )\} \) $PAR
+# $PAR
+# 
+# $PAR
+#  \( \{lp_display_mm([$matrix3->value], top_labels=>$toplabels )\}\)
+# \( \{side_labels(  qw(\text{cash} \text{hours} \text{profits} ) ) \}      \)
+# $PAR 
+#  
+# 
+# one more
+#  \( \{lp_display_mm([$matrix4->value],top_labels=>$toplabels  )\} \)
+#  $PAR
+# At this point you are done since changing any of the non basic variables will only 
+# decrease the profit.
+# END_SOLUTION
+# Context()->normalStrings;
+# 
+# Section::End();
+# 
+# } # END SECTION 3
+# 
+# #########################################################################################################
+# # Section 4 dual problem
+# #########################################################################################################
+# 
+# SECTION4: {
+# Section::Begin("Part 4: The dual problem");
+# 
+# Context()->variables->add(y1=>'Real',y2=>'Real', y3=>'Real', y4=>'Real', w=>'Real',y0=>'Real');
+# $dual_constraint1 = Compute("${bill_money_commitment}y1 +${bill_time_commitment}y2 +y3 >=$bill_profit");
+# $dual_constraint2 = Compute("${steve_money_commitment}y1 +${steve_time_commitment}y2 +y4 >=$steve_profit");
+# $dual_constraints= List($dual_constraint1, $dual_constraint2);
+# 
+# $dual_objfun = Formula("${money_total}y1 +${time_total}y2 + y3 +y4");
+# $popupmaxmin = PopUp(["?","Maximize", "Minimize"], "Minimize");
+# 
+# Context()->texStrings;
+# 
+# BEGIN_TEXT
+# Construct the dual problem for the linear optimization problem above.  The first goal is to calculate
+# an upper bound for the possible profit in the LOP using linear combinations of the inequality constraints.
+# Then formulate the search for the best of these upper bounds in such a way that it 
+# becomes a new LOP -- the dual problem.  Use variables \(y_1,y_2,y_3,y_4\) to create linear combinations
+# of the constraints on money, time and the total probabilities \(p_1\) and \(p_2\) respectively,
+# and create a linear function \(w = Ay_1 + By_2 +Cy_3 +Dy_4\) which guarantees that \(w\) will
+# be larger than any profit one could make. What constraints must \(y_1\dots y_4\) satisfy?
+# $PAR
+# \{ANS($dual_constraints->cmp->withPostFilter(
+# 	linebreak_at_commas()
+# )),ans_box(4,80)\}
+# $PAR The objective function would be:
+#  \(w = \) \{ANS($dual_objfun->cmp), $dual_objfun->ans_rule(50)\}
+# $PAR
+# To get the best possible estimate for the profit in the original problem 
+# you would want to \{ANS($popupmaxmin->cmp),$popupmaxmin->menu\} \(w\);
+# $PAR
+# Why?
+# $PAR
+# \{ANS(essay_cmp()), essay_box(5,80)\}
+# END_TEXT
+# 
+# BEGIN_SOLUTION
+# The profit is less than the minimum of \( w = $dual_objfun \) subject to
+# 
+# \[\begin{aligned}
+# $dual_constraint1 & \\
+# $dual_constraint2 & 
+# \end{aligned}
+# \]
+# The \(y_i\) are the coefficients used to add up the constraint inequalities of the primary problem
+# so as to estimate an upper bound for the profit. If the \(y_i\) are positive values satisfying
+# the constraints then \(w\) will be greater than or equal to the profit.  We get the most precise
+# estimate by finding values of \(y_i\), satisfying the constraints, which give the smallest 
+# possible value for \( w\).
+# 
+# END_SOLUTION
+# Context()->normalStrings;
+# 
+# Section::End();
+# } # END SECTION 4
+# 
+# #########################################################################################################
+# # Section 5 set up dual constraints
+# #########################################################################################################
+# SECTION5: {
+# 
+# Section::Begin("Part 5: Set up dual constraints");
+# Context($context);
+# $dualtableau1 = [[-$bill_money_commitment,-$bill_time_commitment, -1, 0,  1, 0, 0,-$bill_profit], 
+#                  [-$steve_money_commitment, -$steve_time_commitment,0,-1, 0, 1, 0,-$steve_profit],
+#                  [${money_total},${time_total},1, 1, 0,0, 1,0]];
+# $dualmatrix1 = Matrix($dualtableau1);
+# $dualtoplabels = [qw(y1 y2 y3 y4 y5 y6 v b)];
+# $dualmatrix1->{top_labels}=$dualtoplabels;
+# $dualtableau1_string =  lp_display_mm($dualtableau1,top_labels=>$dualtoplabels);
+# 
+# $popup = PopUp(["?","Yes", "No"], "No");
+# 
+# $dual_row_size =2;  # figure these out automatically
+# $dual_col_size =$col_size; 
+# BEGIN_TEXT
+# dualmatrix1 size \{join(",", $dualmatrix1->dimensions)\} $BR
+# $dual_row_size,  $dual_col_size
+# END_TEXT
+# Context()->texStrings;
+# 
+# BEGIN_TEXT
+# $PAR
+# For this first effort let's rewrite the equations so that they are in "standard" form, meaning
+# that the inequalities are all less than or equal to and that the goal is to maximize \(v = -w\).
+# This will probably mean that you will have to rewrite the natural way in which you set up 
+# the problem above.  Some coefficients will change sign. 
+# We will still be using the convention that 
+# the coefficient of \(v\) will be \(1\).
+# 
+# $PAR
+# \{MATRIX_ENTRY_BUTTON($dualmatrix1)\}
+# \{ANS($dualmatrix1->cmp()), $dualmatrix1->ans_array \}
+# $PAR
+# (This tableau is for maximizing \(v\), aka \(-w\) -- there are two minus sign switches. )
+# $PAR 
+# Is there a natural feasible solution to this problem? In other words does setting the 
+# problem parameters equal to 0 provide a feasible solution?
+# \{ANS($popup->cmp),$popup->menu \} 
+# $PAR
+# Explain why or why not and what are your options for getting started.
+# \{ ANS(essay_cmp()), essay_box(10,80) \}
+# $PAR
+# END_TEXT
+# 
+# BEGIN_SOLUTION
+# \[  $dualtableau1_string  \]
+# $PAR
+# Setting the parameters \(y_1, y_2\) to zero is not a feasible solution. 
+# Options for finding a first feasible solution include guessing (not a bad choice
+# for a problem this small), using prior knowledge (e.g. a known optimal solution to
+# a similar problem), creating an auxiliary problem to find a feasible point,
+# and the "shortcut method" which is an accelerated version of the "auxiliary method". 
+# END_SOLUTION
+# Context()->normalStrings;
+# Section::End();
+# 
+# } #END SECTION 5
+# #########################################################################################################
+# # Begin section 6 -- solve the tableau using  simplex method
+# # section 6 (13matrix, 14essay)
+# # First we have to find a feasible solution -- phase 1
+# # We'll use the auxiliary method -- adding an extra slack variable.
+# #########################################################################################################
+# 
+# SECTION6: { 
+# Section::Begin("Part 6: Solve the dual tableau using the simplex method");
+# Context($context);
+# $dualtableau2 = [[-1,-$bill_money_commitment,-$bill_time_commitment, -1, 0, 	1,0,0,0,-$bill_profit], 
+#                  [-1,-$steve_money_commitment,-$steve_time_commitment, 0, -1, 0,1,0,0,-$steve_profit],
+#                  [1,0,0,0,0,0,0,0,1,0],
+#                  [0,$money_total,$time_total,1,1,0,0,1,0,0]];
+# $dualmatrix2 = Matrix($dualtableau2);
+# $orginal_dual_matrix=$dualmatrix2;
+# $dualtoplabelsphase1 = [qw(y0 y1 y2 y3 y4 y5 y6 v z b)];
+# $dualmatrix2->{top_labels}= $dualtoplabelsphase1;
+# $dual_constraint1phase1 = Compute("-${bill_money_commitment}y1 -${bill_time_commitment}y2 -y3 <=-$bill_profit+y0");
+# $dual_constraint2phase1 = Compute("-${steve_money_commitment}y1 -${steve_time_commitment}y2 -y4 <=-$steve_profit+y0");
+# $dualconstraintsphase1 = List($dual_constraint1phase1,$dual_constraint2phase1);
+# $dualpivot2=Point(1,1);
+# $dualbasis2=Set(6,7);
+# #########################################################################################################
+# # section 6 answers (15essay 16matrix)
+# #########################################################################################################
+# Context()->texStrings;
+# 
+# BEGIN_TEXT
+# Using the auxiliary method write the LOP for finding 
+# the first feasible point.  Write  
+# the new constraints to be used by auxiliary method. $PAR
+# \{  ANS($dualconstraintsphase1->cmp),ans_box(3,80) \}
+# $PAR
+# We will continue to use the convention that we are maximizing
+# the auxiliary function so there will be some minus signs that need to be taken into account.
+# We'll let \(z = -y_0\) and try to maximize \(z\). 
+# $PAR
+# Now construct the tableau you'll use for the auxiliary method. 
+# Add a first column for the extra slack variable and a next to the last row 
+# for the new objective function value \(z\) and write the new tableau. 
+# The next to the last row will hold the objective function for \(z\). 
+# The last row will hold the original
+# dual objective function which we'll just carry along.
+# $PAR
+# \{MATRIX_ENTRY_BUTTON($dualmatrix2)\}
+# \{ANS($dualmatrix2->cmp()), $dualmatrix2->ans_array \}
+# $PAR
+# END_TEXT
+# #########################################################################################################
+# # debugging display code
+# #########################################################################################################
+# BEGIN_TEXT
+# $PAR
+# \{display_tableau_state($orginal_dual_matrix,$dualtableau2, $dualmatrix2,  $dualbasis2,  $dualpivot2)\} 
+# $PAR
+# END_TEXT
+# 
+# Context()->normalStrings;
+# 
+# Context()->texStrings;
+# BEGIN_SOLUTION
+# New objective: Maximize \(z = -y_0 \) subject to 
+# \[\begin{align}
+# $dual_constraint1phase1&\\
+# $dual_constraint2phase1 &\\
+# \end{align}
+# \] with all variables non-negative.
+# $PAR
+# If \(y_0\) is large enough this always has a feasible solution with  
+# \(y_1=y_2=0\).
+# 
+# \[  \{lp_display_mm($dualtableau2) \}  \]
+# $PAR
+# END_SOLUTION
+# Context()->normalStrings;
+# Section::End();
+# } #END_SECTION 6
+# #########################################################################################################
+# # Section 7  final comparisons of primary and dual results.
+# #########################################################################################################
+# SECTION7: {
+# Section::Begin("Part 7: do phase 1 simplex method");
+# 
+# 
+#  #($tableau3,$basis3, $statevars3) = lp_basis_pivot($dualtableau2,$dualbasis2,$dualpivot2);
+#  #$B3 = matrix_from_submatrix($original_matrix,rows=>[1..$row_size],columns=>$basis3->data);
+#  #$matrix3 = ($B3->det)*Matrix($tableau3);
+# # $matrix3->{top_labels}=$toplabels;
+#  #$state3=Matrix([[@$statevars3]]);
+# #########################################################################################################
+# # debugging display code
+# #########################################################################################################
+# BEGIN_TEXT
+# $PAR
+# \{display_tableau_state($orginal_dual_matrix,$dualtableau3, $dualmatrix3,  $dualbasis3,   $dualpivot3)\} 
+# $PAR
+# END_TEXT
+# 
+# $pivot4 = Point("(1,1)");
+# $dualtableau3 = lp_pivot($dualtableau2,0,0);
+# $dualmatrix3 = Matrix($dualtableau3);
+# $dualmatrix3->{top_labels}=$dualtoplabelsphase1;
+# $dualtableau3_string =  lp_display_mm($dualtableau3);
+# $z_initial=-$bill_profit;  # a hint
+# # this is the initial value of the z=-y0 variable we are maximizing?
+# 
+# # now start to maximize z
+# $pivot5 = Point("(2,2)");
+# $dualtableau4 = lp_pivot($dualtableau3,1,1);
+# $denom1 = 2000;
+# $dualmatrix4 = $denom1*Matrix($dualtableau4);
+# $dualmatrix4->{top_labels}=$dualtoplabelsphase1;
+# $dualtableau4_string =  lp_display_mm($dualmatrix4);
+# $pivot6 = Point("(1,3)");
+# $dualtableau5 = lp_pivot($dualtableau4,0,2);
+# 
+# ## FIXME entries close to zero in a matrix are not being compared properly. 
+# ## FIXME tolerance and tolType are being ignored
+# 
+# #$dualtableau5->[2][3]=0;
+# #$dualtableau5->[2][5]=0;
+# 
+# $denom2 = 1.3E6;
+# $dualmatrix5 = $denom2*Matrix($dualtableau5);
+# $dualmatrix5->{top_labels}=$dualtoplabelsphase1;
+# $dualtableau5_string =  lp_display_mm($dualmatrix5);
+# $state5 = Matrix([[ 6.4615,		0.423,		0,		0,		-6415.38]]);
+# $popup5 = PopUp(["?","Yes", "No"], "No");
+# #########################################################################################################
+# # Section 7 answers 17,18matrix,19,20matrix,21,22matrix,23, 24,25essay
+# #########################################################################################################
+# 
+# 
+# 
+# Context()->texStrings;
+# 
+# BEGIN_TEXT
+# The first pivot, which will make the right hand side entries positive is 
+# \{ANS($pivot4->cmp),$pivot4->ans_rule \}. $PAR
+# Recall that in the case of tie we take entry with the least index
+# (i.e. left most or upper most. )
+# $PAR
+# 
+# 
+# The resulting tableau is  $PAR
+# \{MATRIX_ENTRY_BUTTON($dualmatrix3)\}
+# \{ANS($dualmatrix3->cmp), $dualmatrix3->ans_array() \}
+# 
+# The value of \(z=-y_0\) is \($z_initial\). 
+# $PAR
+# The next pivot, following the simplex method to maximize \(z\), is
+# \{ANS($pivot5->cmp), $pivot5->ans_rule\}. 
+# $PAR 
+# (Many of the following answers have lots of zeros.  You can use the shortcut
+# 1E3 to stand for \(1\times 10^3\). )
+# $PAR
+# Notice that because of the zero on the right hand side none of the state variables change.  We had three
+# hyperplanes intersecting at a point and we have changed our mind about which
+# of those three we consider basic. The new tableau is 
+# $PAR
+# \{MATRIX_ENTRY_BUTTON($dualmatrix4)\}
+# \{ANS($dualmatrix4->cmp), $dualmatrix4->ans_array() \}
+# $PAR
+# The next pivot \{ ANS($pivot6->cmp), $pivot6->ans_rule \} leads to $PAR
+# \{MATRIX_ENTRY_BUTTON($dualmatrix5)\}
+# \{#FIXME -- these tolerance leveals are being ignored \}
+# \{ANS($dualmatrix5->cmp(zeroLevel=>.1, zeroLevelTol=>.1)), $dualmatrix5->ans_array() \}
+# 
+# $PAR and we notice that now \(z=-y_0=0\) so we have found a basic feasible solution to our 
+# original dual problem.  The variables \(y_1,y_2,y_3,y_4,v\) for this 
+# solution are 
+# $PAR
+# 
+# \{ANS($state5->cmp),$state5->ans_array\}
+# $PAR
+# Do we need to continue to optimize the value for \(v\)?
+# \{ANS($popup5->cmp), $popup5->menu()\}  Why? $PAR
+# \{ANS(essay_cmp), essay_box(3,80)\}
+# $PAR
+# Compare this answer \(v^*= -w^*\) to the dual problem to the optimal value \(P^*\)for the primary problem.
+# The problems' goals were to maximize \(P\) and to minimize \(w\). 
+# $PAR
+# 
+# END_TEXT
+# 
+# BEGIN_SOLUTION
+# The first pivot is \($pivot4\) which makes the right hand side entries positive. 
+# $PAR
+# \[$dualtableau3_string\]
+# $PAR
+# The next pivot is \($pivot5\).  It follows the simplex rule of choosing the row
+# with the most restrictive ratio -- in this case zero.  The result is simply to
+# choose a new representation of the same point -- no change in state takes place.
+# $PAR\[$dualtableau4_string\]
+# $PAR
+# The final pivot (as it turns out) is \($pivot6\). At this point we are done with
+# phase 1 because the value of \(z=-y_0=0\) so we have maximized \(z\) and 
+# minimized \(y_0\) to \(0\)
+# $PAR\[$dualtableau5_string\]
+# $PAR
+# At this point we notice that the coefficients in the last row are such that
+# we cannot increase the value of \(v\) any further. \(v\) is at its maximum
+# and \(w=-v\) is at its minimum.  The minimum value of \(w=6000\) which is the 
+# same as the maximum profit that we found in the first example.
+# END_SOLUTION
+# Context()->normalStrings;
+# Section::End();
+# TEXT($END_ONE_COLUMN);
+# Scaffold::End();
+# } # END SECTION 7
+ENDDOCUMENT();
+
