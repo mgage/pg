@@ -1,0 +1,60 @@
+##DESCRIPTION
+
+
+
+##ENDDESCRIPTION
+
+
+DOCUMENT();        # This should be the first executable line in the problem.
+
+loadMacros(
+   "PGstandard.pl",     # Standard macros for PG language
+   "MathObjects.pl",
+   #"source.pl",         # used to display problem source button
+   "PGcourse.pl",      # Customization file for the course
+);
+
+TEXT(beginproblem());
+$showPartialCorrectAnswers = 1;
+
+##############################################################
+#
+#  Setup
+#
+#
+Context("Matrix");
+
+##############################################################
+#
+#  Text
+#
+#
+
+#$m = Matrix([[0,1,0,0,0,0,0,0,0,0.423077],[0.00153846,0,1,-0.00230769,0.00384615,0.00230769,-0.00384615,0,0,6.46154]]);
+$c = Real(1300000); # this gives "can't convert a Real Number to a Matrix";
+# $c = Real(130000); # this works
+#$c = Real(1300000)->value; # this also works
+$m = Matrix([[1,2],[3,4]]);
+
+
+Context()->texStrings;
+$string = $c*$m;
+BEGIN_TEXT
+
+\[ $string \] $PAR
+
+\[\{$c*$m\}\]
+
+END_TEXT
+Context()->normalStrings;
+
+
+##############################################################
+#
+#  Answers
+#
+#
+
+
+
+ENDDOCUMENT();        # This should be the last executable line in the problem.

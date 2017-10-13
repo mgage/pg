@@ -1,0 +1,105 @@
+##DESCRIPTION
+
+
+
+##ENDDESCRIPTION
+
+
+DOCUMENT();        # This should be the first executable line in the problem.
+
+loadMacros(
+   "PGstandard.pl",     # Standard macros for PG language
+   "MathObjects.pl",
+   "PGML.pl",
+   "tableau.pl",
+   #"source.pl",         # used to display problem source button
+   "PGcourse.pl",      # Customization file for the course
+);
+
+TEXT(beginproblem());
+$showPartialCorrectAnswers = 1;
+
+##############################################################
+#
+#  Setup
+#
+#
+Context("Matrix");
+
+$m = Matrix([1,2,3],[4,5,6],[7,8,9]);
+$n = Matrix([4,5,6],[2,4,6],[7,8,9]);
+
+@rows1 = matrix_extract_rows($m);
+@rows2 = matrix_extract_rows($n);
+
+@rows1a= map {Vector($_)} @rows1;
+TEXT( join(" ", @rows1a));
+@rows2a= map {Vector($_)} @rows2;
+##############################################################
+#
+#  Text
+#
+#
+sub tableauEquivalence_orig {
+	return sub {
+		my ($correct,$student,$ansHash,$nth,$value)=@_;
+		my $score = Vector($correct)->cmp(parallel=>1)->evaluate(Vector($student))->{score};
+		return $score;
+	}
+ }
+
+# $rh_ans=List(@rows1a)->cmp(checker=>sub {
+# 	my ($correct,$student,$ansHash,$nth,$value)=@_;
+#     my $score = $correct->cmp(parallel=>1)->evaluate($student)->{score};
+#     return $score;
+# })->evaluate(List(@rows2a));
+
+$rh_ans=List(@rows1a)->cmp(checker=>tableauEquivalence_orig())->evaluate(List(@rows2a));
+$rh_ans2 = List(@rows1)->cmp(checker=>tableauEquivalence_orig())->evaluate(List(@rows2));
+Context()->texStrings;
+
+$rh_ans3 = $m->cmp(checker=>tableauEquivalence())->evaluate($n);
+BEGIN_TEXT
+rows : \[\{join(" ", @rows1,"|||",@rows2)\}\]; $PAR
+
+rows are equal \{$rh_ans->{score}\} $PAR
+rows are equal (even with out being classed to Vector) \{$rh_ans2->{score}\} $PAR
+Comparing as matrices \{$rh_ans3->{score}\}$PAR
+\{pretty_print($rh_ans)\} $PAR
+\{pretty_print($rh_ans2)\}$PAR
+
+
+
+$PAR
+
+END_TEXT
+
+Context()->normalStrings;
+
+# This works in online PG lab
+
+# $a= Vector(1,2,3);
+# $b= Vector(2,4,6);
+# $c= Vector(4,2,3);
+# $d=Vector(8,4,6);
+# 
+# $list2=List($d,$a);
+# TEXT( $list1 = List($a,$c)->cmp(
+# checker=> sub {
+#    my ($correct,$student,$ansHash,$nth,$value)=@_;
+#    my $score = $correct->cmp(parallel=>1)->evaluate($student)->{score};
+#    return $score;
+# }
+# )->evaluate($list2)->pretty_print );
+# 
+# TEXT($a->cmp(parallel=>1)->evaluate($b)->pretty_print);
+
+##############################################################
+#
+#  Answers
+#
+#
+
+
+
+ENDDOCUMENT();        # This should be the last executable line in the problem.

@@ -43,12 +43,13 @@ The structure of the tableau is:
 	----------------------------------------------
 	|        -c          |     0       | 1  | 0  |
 	----------------------------------------------
-	Matrix A, the constraint matrix is n by m
+	Matrix A, the constraint matrix is n=num_problem_vars by m=num_slack_vars
 	Matrix S, the slack variables is m by m
 	Matrix b, the constraint constants is n by 1
-	Matrix c, the objective function coefficients is 1 by n
+	Matrix c, the objective function coefficients matrix is 1 by n or 2 by n
 	The next to the last column holds z or objective value
 	z(...x^i...) = c_i* x^i  (Einstein summation convention)
+	FIXME:  allow c to be a 2 by n matrix so that you can do phase1 calculations easily 
 
 
 =cut
@@ -177,193 +178,46 @@ More references: L<lib/Matrix.pm>
 
 
 sub _tableau_init {};   # don't reload this file
-package main;
 
-sub isMatrix {
-	my $m = shift;
-	return ref($m) =~/Value::Matrix/i;
-}
-sub matrix_column_slice{
-	matrix_from_matrix_cols(@_);
-}
-sub matrix_from_matrix_cols {
-	my $M = shift;   # a MathObject matrix_columns
-	my($n,$m) = $M->dimensions;
-	my @slice = @_;
-	if (ref($slice[0]) =~ /ARRAY/) { # handle array reference
-		@slice = @{$slice[0]};
+loadMacros("tableau_main_subroutines.pl");
+
+# tableauEquivalence is meant to compare two matrices up 
+# reshuffling the rows and multiplying each row by a constant.
+# E.g. equivalent up to multiplying on the left by permuation matrix 
+# or a (non-uniformly constant) diagonal matrix
+#useage tableauEquivalence
+# $tableaus_are_equal = 
+#List($tableau1->extract_rows)->cmp(checker=>tableauEquivalence)
+#     ->evaluate(List($tableau2->extract_rows))->score :
+
+sub tableauEquivalence {
+	return sub {
+		my ($correct, $student, $ansHash) = @_;
+		# convert matrices to arrays of row references
+		my @rows1 = matrix_extract_rows($correct);
+		my @rows2 = matrix_extract_rows($student);
+		# compare the rows as lists with each row being compared as 
+		# a parallel Vector (i.e. up to multiples)
+		my $score = List(@rows1)->cmp( checker =>
+				sub {
+					my ($listcorrect,$liststudent,$listansHash,$nth,$value)=@_;
+					my $listscore = Vector($listcorrect)->cmp(parallel=>1)
+						  ->evaluate(Vector($liststudent))->{score};
+					return $listscore;
+				}
+		)->evaluate(List(@rows2))->{score};
+		return $score;
 	}
-	@slice = @slice?@slice : (1..$m);
-	my @columns = map {$M->column($_)->transpose->value} @slice;   
-	 #create the chosen columns as rows
-	 # then transform to array_refs.
-	Matrix(@columns)->transpose;	#transpose and return an n by m matrix (2 dim)	
-}
-sub matrix_row_slice{
-	matrix_from_matrix_rows(@_);
-}
-
-sub matrix_from_matrix_rows {
-	my $M = shift;   # a MathObject matrix_columns
-	unless (isMatrix($M)){
-		WARN_MESSAGE( "matrix_from_matrix_rows: |".ref($M)."| or |$M| is not a MathObject Matrix");
-		return undef;
-	}
-
-	my($n,$m) = $M->dimensions;
-	my @slice = @_;
-	if (ref($slice[0]) =~ /ARRAY/) { # handle array reference
-		@slice = @{$slice[0]};
-	}
-	@slice = @slice? @slice : (1..$n); # the default is the whole matrix.
-	# DEBUG_MESSAGE("row slice in matrix from rows is @slice");
-	my @rows = map {[$M->row($_)->value]} @slice;   
-	 #create the chosen columns as rows
-	 # then transform to array_refs.
-	Matrix([@rows]); # insure that it is still an n by m matrix	(2 dim)
-}
-
-sub matrix_extract_submatrix {
-	matrix_from_submatrix(@_);
-}
-sub matrix_from_submatrix {
-	my $M=shift;
-	unless (isMatrix($M)){
-		warn( "matrix_from_submatrix: |".ref($M)."| or |$M| is not a MathObject Matrix");
-		return undef;
-	}
-
-	my %options = @_;
-	my($n,$m) = $M->dimensions;
-	my $row_slice = ($options{rows})?$options{rows}:[1..$m];
-	my $col_slice = ($options{columns})?$options{columns}:[1..$n];
-	# DEBUG_MESSAGE("ROW SLICE", join(" ", @$row_slice));
-	# DEBUG_MESSAGE("COL SLICE", join(" ", @$col_slice));
-	my $M1 = matrix_from_matrix_rows($M,@$row_slice);
-	# DEBUG_MESSAGE("M1 - matrix from rows) $M1");
-	return matrix_from_matrix_cols($M1, @$col_slice);
-}
-sub matrix_extract_rows {
-	my $M =shift;
-		unless (isMatrix($M)){
-		WARN_MESSAGE( "matrix_extract_rows: |".ref($M)."| or |$M| is not a MathObject Matrix");
-		return undef;
-	}
-
-	my @slice = @_;
-	if (ref($slice[0]) =~ /ARRAY/) { # handle array reference
-		@slice = @{$slice[0]};
-	} elsif (@slice == 0) { # export all rows to List
-		@slice = ( 1..(($M->dimensions)[0]) );	
-	}
-	return map {$M->row($_)} @slice ;
-}
-
-sub matrix_rows_to_list {
-	List(matrix_extract_rows(@_));
-}
-sub matrix_columns_to_list {
-	List(matrix_extract_columns(@_) );
-}
-sub matrix_extract_columns {
-	my $M =shift;   # Add error checking
-	unless (isMatrix($M)){
-		WARN_MESSAGE( "matrix_extract_columns: |".ref($M)."| or |$M| is not a MathObject Matrix");
-		return undef;
-	}
-
-	my @slice = @_;
-	if (ref($slice[0]) =~ /ARRAY/) { # handle array reference
-		@slice = @{$slice[0]};
-	} elsif (@slice == 0) { # export all columns to an array
-		@slice = 1..($M->dimensions->[1]);	
-	}
-    return map {$M->column($_)} @slice;
-}
+	# this function returns a subroutine to be inserted 
+	# into $tableau->cmp(checker=>tableauEquivalence)
+ }
 
 
+# Useage linebreak_at_commas
+# $foochecker =  $constraints->cmp()->withPostFilter(
+# 	linebreak_at_commas()
+# );
 
-########################
-##############
-# get_tableau_variable_values
-#
-# Calculates the values of the basis variables of the tableau, 
-# assuming the parameter variables are 0.
-#
-# Usage:   ARRAY = get_tableau_variable_values($MathObjectMatrix_tableau, $MathObjectSet_basis)
-# 
-# feature request -- for tableau object -- allow specification of non-zero parameter variables
-sub get_tableau_variable_values {
-   my $mat = shift;  # a MathObject matrix
- 	unless (isMatrix($mat)){
-		WARN_MESSAGE( "get_tableau_variable_values: |".ref($mat)."| or |$mat| is not a MathObject Matrix");
-		return Matrix([0]);
-	}
-   my $basis =shift; # a MathObject set
-   # FIXME
-   # type check ref($mat)='Matrix'; ref($basis)='Set';
-   # or check that $mat has dimensions, element methods; and $basis has a contains method
-   my ($n, $m) = $mat->dimensions;
-   @var = ();
-   #DEBUG_MESSAGE( "start new matrix");
-   foreach my $j (1..$m-2) {    # the last two columns of the tableau are object variable and constants
-      if (not $basis->contains($j)) {
-            # DEBUG_MESSAGE( "j= $j not in basis");  # set the parameter values to zero
-           $var[$j-1]=0; next; # non-basis variables (parameters) are set to 0. 
-            
-      } else {
-            foreach my $i (1..$n-1) {  # the last row is the objective function
-               # if this is a basis column there should be only one non-zero element(the pivot)
-               if ( $mat->element($i,$j)->value != 0 ) { # should this have ->value?????
-                  $var[$j-1] = ($mat->element($i,$m)/($mat->element($i,$j))->value);                  
-                  # DEBUG_MESSAGE("i=$i j=$j var = $var[$j-1] "); # calculate basis variable value
-                 next;
-               }
-             
-            }
-      }
-  }                    # element($n, $m-1) is the coefficient of the objective value. 
-                       # this last variable is the value of the objective function
-  # check for division by zero
-  if ($mat->element($n,$m-1)->value != 0 ) {
-  	push @var , ($mat->element($n,$m)/$mat->element($n,$m-1))->value;
-  } else {
-  	push @var , '.666';
-  }
-  return wantarray ? @var : \@var; # return either array or reference to an array
-}
-#### Test -- assume matrix is this 
-#    	1	2	1	0	0 |	0 |	3
-#		4	5	0	1	0 |	0 |	6
-#		7	8	0	0	1 |	0 |	9
-#		-1	-2	0	0	0 |	1 |	10  # objective row
-# and basis is {3,4,5}  (start columns with 1)
-#  $n= 4;  $m = 7
-#  $x1=0; $x2=0; $x3=s1=3; $x4=s2=6; $x5=s3=9; w=10=objective value
-# 
-#
-
-####################################
-#
-#   Cover for lp_pivot which allows us to use a set object for the new and old basis
-
-sub lp_basis_pivot {
-	my ($old_tableau,$old_basis,$pivot) = @_;  # $pivot is a Value::Point
-	my $new_tableau= lp_clone($old_tableau);
-	# lp_pivot has 0 based indices
-	main::lp_pivot($new_tableau, $pivot->extract(1)-1,$pivot->extract(2)-1);
-	# lp_pivot pivots in place	
-	my $new_matrix = Matrix($new_tableau);
-	my ($n,$m) = $new_matrix->dimensions;
-	my $param_size = $m-$n -1;	#n=constraints+1, #m = $param_size + $constraints +2
-	my $new_basis = ( $old_basis - ($pivot->extract(1)+$param_size) + ($pivot->extract(2)) )->sort;
-	my @statevars = get_tableau_variable_values($new_matrix, $new_basis);
-	return ( $new_tableau, Set($new_basis),\@statevars); 
-	# force to set (from type Union) to insure that ->data is an array and not a string.
-}
-
- 
- 
 sub linebreak_at_commas {
 	return sub {
 		my $ans=shift;
@@ -378,10 +232,6 @@ sub linebreak_at_commas {
 		$ans;
 	};
 }
-# Useage
-# $foochecker =  $constraints->cmp()->withPostFilter(
-# 	linebreak_at_commas()
-# );
 
 
 ##################################################
@@ -399,7 +249,7 @@ sub new {
 	my $tableau = {
 		A => undef, # constraint matrix  MathObjectMatrix
 		b => undef, # constraint constants Vector or MathObjectMatrix 1 by n
-		c => undef, # coefficients for objective function Vector or MathObjectMatrix 1 by n
+		c => undef, # coefficients for objective function  MathObjectMatrix 1 by n or 2 by n matrix
 		obj_row => undef, # contains the negative of the coefficients of the objective function.
 		z => undef, # value for objective function
 		n => undef, # dimension of problem variables (columns in A)
@@ -408,10 +258,11 @@ sub new {
 		basis => undef, # list describing the current basis columns corresponding to determined variables.
 		B => undef,  # square invertible matrix corresponding to the current basis columns
 		M => undef,  # matrix of consisting of all columns and all rows except for the objective function row
-		obj_col_num => undef, # flag indicating the column (1 or n+m+1) for the objective value
+		obj_col_index => undef, # an array reference indicating the columns (e.g 1 or n+m+1) for the objective value or values
 		constraint_labels => undef,
 		problem_var_labels => undef, 
 		slack_var_labels => undef,
+
 		@_,
 	};
 	bless $tableau, $class;
