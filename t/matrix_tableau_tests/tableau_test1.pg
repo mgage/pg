@@ -36,7 +36,7 @@ $m2 = $m->column_slice([3,2,1]);
 
 $list = $m->extract_rows_to_list(2,3);
 
-$b = Matrix([1, 2, 3, 4]);
+$b = Matrix([1, 2, 3, 4])->transpose; # make it an n by 1 matrix
 #TEXT($BR, "vector", $b->data->[1]);
 $c = Matrix([5, 6, 7]);
 $t = Tableau->new(A=>$m,b=>$b, c=>$c);

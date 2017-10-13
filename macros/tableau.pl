@@ -46,11 +46,13 @@ The structure of the tableau is:
 	Matrix A, the constraint matrix is n by m
 	Matrix S, the slack variables is m by m
 	Matrix b, the constraint constants is n by 1
+	Matrix c, the objective function coefficients is 1 by n
 	The next to the last column holds z or objective value
 	z(...x^i...) = c_i* x^i  (Einstein summation convention)
 
 
 =cut
+
 
 =head2 Package main
 
@@ -177,6 +179,10 @@ More references: L<lib/Matrix.pm>
 sub _tableau_init {};   # don't reload this file
 package main;
 
+sub isMatrix {
+	my $m = shift;
+	return ref($m) =~/Value::Matrix/i;
+}
 sub matrix_column_slice{
 	matrix_from_matrix_cols(@_);
 }
@@ -199,6 +205,11 @@ sub matrix_row_slice{
 
 sub matrix_from_matrix_rows {
 	my $M = shift;   # a MathObject matrix_columns
+	unless (isMatrix($M)){
+		WARN_MESSAGE( "matrix_from_matrix_rows: |".ref($M)."| or |$M| is not a MathObject Matrix");
+		return undef;
+	}
+
 	my($n,$m) = $M->dimensions;
 	my @slice = @_;
 	if (ref($slice[0]) =~ /ARRAY/) { # handle array reference
@@ -217,7 +228,11 @@ sub matrix_extract_submatrix {
 }
 sub matrix_from_submatrix {
 	my $M=shift;
-	return undef unless ref($M) =~ /Value::Matrix/;
+	unless (isMatrix($M)){
+		warn( "matrix_from_submatrix: |".ref($M)."| or |$M| is not a MathObject Matrix");
+		return undef;
+	}
+
 	my %options = @_;
 	my($n,$m) = $M->dimensions;
 	my $row_slice = ($options{rows})?$options{rows}:[1..$m];
@@ -230,6 +245,11 @@ sub matrix_from_submatrix {
 }
 sub matrix_extract_rows {
 	my $M =shift;
+		unless (isMatrix($M)){
+		WARN_MESSAGE( "matrix_extract_rows: |".ref($M)."| or |$M| is not a MathObject Matrix");
+		return undef;
+	}
+
 	my @slice = @_;
 	if (ref($slice[0]) =~ /ARRAY/) { # handle array reference
 		@slice = @{$slice[0]};
@@ -247,6 +267,11 @@ sub matrix_columns_to_list {
 }
 sub matrix_extract_columns {
 	my $M =shift;   # Add error checking
+	unless (isMatrix($M)){
+		WARN_MESSAGE( "matrix_extract_columns: |".ref($M)."| or |$M| is not a MathObject Matrix");
+		return undef;
+	}
+
 	my @slice = @_;
 	if (ref($slice[0]) =~ /ARRAY/) { # handle array reference
 		@slice = @{$slice[0]};
@@ -270,6 +295,10 @@ sub matrix_extract_columns {
 # feature request -- for tableau object -- allow specification of non-zero parameter variables
 sub get_tableau_variable_values {
    my $mat = shift;  # a MathObject matrix
+ 	unless (isMatrix($mat)){
+		WARN_MESSAGE( "get_tableau_variable_values: |".ref($mat)."| or |$mat| is not a MathObject Matrix");
+		return Matrix([0]);
+	}
    my $basis =shift; # a MathObject set
    # FIXME
    # type check ref($mat)='Matrix'; ref($basis)='Set';
@@ -279,7 +308,7 @@ sub get_tableau_variable_values {
    #DEBUG_MESSAGE( "start new matrix");
    foreach my $j (1..$m-2) {    # the last two columns of the tableau are object variable and constants
       if (not $basis->contains($j)) {
-            DEBUG_MESSAGE( "j= $j not in basis");  # set the parameter values to zero
+            # DEBUG_MESSAGE( "j= $j not in basis");  # set the parameter values to zero
            $var[$j-1]=0; next; # non-basis variables (parameters) are set to 0. 
             
       } else {
@@ -287,7 +316,7 @@ sub get_tableau_variable_values {
                # if this is a basis column there should be only one non-zero element(the pivot)
                if ( $mat->element($i,$j)->value != 0 ) { # should this have ->value?????
                   $var[$j-1] = ($mat->element($i,$m)/($mat->element($i,$j))->value);                  
-                  DEBUG_MESSAGE("i=$i j=$j var = $var[$j-1] "); # calculate basis variable value
+                  # DEBUG_MESSAGE("i=$i j=$j var = $var[$j-1] "); # calculate basis variable value
                  next;
                }
              
@@ -295,7 +324,12 @@ sub get_tableau_variable_values {
       }
   }                    # element($n, $m-1) is the coefficient of the objective value. 
                        # this last variable is the value of the objective function
-  push @var , ($mat->element($n,$m)/$mat->element($n,$m-1))->value;
+  # check for division by zero
+  if ($mat->element($n,$m-1)->value != 0 ) {
+  	push @var , ($mat->element($n,$m)/$mat->element($n,$m-1))->value;
+  } else {
+  	push @var , '.666';
+  }
   return wantarray ? @var : \@var; # return either array or reference to an array
 }
 #### Test -- assume matrix is this 
@@ -406,10 +440,10 @@ sub initialize {
 	$self->{S} = Value::Matrix->I($m);
 	$self->{basis} = [($n+1)...($n+$m)] unless ref($self->{basis})=~/ARRAY/;
 	my @rows = $self->assemble_matrix;
-	#main::DEBUG_MESSAGE("rows", @rows);
+	# main::DEBUG_MESSAGE("rows", map {ref($_)?$_->value :$_} map {@$_} @rows);
 	$self->{M} = _Matrix([@rows]);
 	$self->{B} = $self->{M}->submatrix(rows=>[1..($self->{m})],columns=>$self->{basis});
-	$self->{obj_row} = _Matrix($self->objective_row());
+	$self->{obj_row} = _Matrix(@{$self->objective_row()});
 	return();	
 }
 		
@@ -421,31 +455,33 @@ sub assemble_matrix {
 	foreach my $i (1..$m) {
 		my @current_row=();
 		foreach my $j (1..$n) {
-			push @current_row, $self->{A}->element($i, $j);
+			push @current_row, $self->{A}->element($i, $j)->value;
 		}
 		foreach my $j (1..$m) {
-			push @current_row, $self->{S}->element($i,$j); # slack variables
+			push @current_row, $self->{S}->element($i,$j)->value; # slack variables
 		}
-		push @current_row, 0, $self->{b}->data->[$i-1];    # obj column and constant column
+		push @current_row, 0, $self->{b}->row($i)->value;    # obj column and constant column
 		push @rows, [@current_row]; 
 	}
 
 	return @rows;   # these are the matrices A | S | obj | b   
-	                # the final row describing the objective function is not in this 
+	                # the final row describing the objective function 
+	                # is not in this part of the matrix
 }
 
 sub objective_row {
 	my $self = shift;
 	my @last_row=();
-	push @last_row, ( -($self->{c}) )->value;
-	foreach my $i (1..($self->{m})) { push @last_row, 0 };
-	push @last_row, 1, 0;
+	push @last_row, ( -($self->{c}) )->value;  # add the negative coefficients of the obj function
+	foreach my $i (1..($self->{m})) { push @last_row, 0 }; # add 0s for the slack variables
+	push @last_row, 1, 0; # add the 1 for the objective value and 0 for the initial valu
 	return \@last_row;
 }
 
 # return a matrix containing the entire tableau
 sub current_tableau {
-	my $Badj = ($self->{B}->det) * ($self->{B}->inverse);
+	my $self = shift;
+	my $Badj = ($self->{B}->det->value) * ($self->{B}->inverse);
 	my $current_tableau = $Badj * $self->{M};  # the A | S | obj | b
 	$self->{current_tableau}=$current_tableau;
 	# find the coefficients associated with the basis columns
@@ -454,7 +490,9 @@ sub current_tableau {
 	my $correction_coeff = ($c_B2*$current_tableau )->row(1);
 	# subtract the correction coefficients from the obj_row
 	# this essentially extends Gauss reduction applied to the obj_row
-	my $obj_row_normalized = ($self->{B}->det) *$self->{obj_row};
+	my $obj_row_normalized = ($self->{B}->det->value) *$self->{obj_row};
+	#main::DEBUG_MESSAGE(" normalized obj row ",$obj_row_normalized->value);
+	#main::DEBUG_MESSAGE(" correction coeff ", $correction_coeff->value);
 	my $current_coeff = $obj_row_normalized-$correction_coeff ;
 	$self->{current_coeff}= $current_coeff; 
 
@@ -470,12 +508,16 @@ sub current_tableau {
 
 sub basis {
 	my $self = shift;  #update basis
+	                   # basis is stored as an ARRAY reference. 
+	                   # basis is exported as a list
 	my @input = @_;
 	return Value::List->new($self->{basis}) unless @input;  #return basis if no input
 	my $new_basis;
 	if (ref( $input[0]) =~/ARRAY/) {
 		$new_basis=$input[0];
-	} else {
+	} elsif (ref( $input[0]) =~/List|Set/){
+		$new_basis = $input[0]->value;
+	} else { # input is assumed to be an array
 		$new_basis = \@input;
 	}
 	$self->{basis}= $new_basis;

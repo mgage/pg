@@ -1,0 +1,177 @@
+DOCUMENT();  
+loadMacros(
+"PGstandard.pl",
+"MathObjects.pl",
+"parserPopUp.pl",
+"unionLists.pl",
+"MatrixReduce.pl",
+#"AppletObjects.pl",
+"PGessaymacros.pl",
+"PGmatrixmacros.pl",
+"LinearProgramming.pl",
+"parserLinearInequality.pl",
+"quickMatrixEntry.pl",
+#"scaffold.pl",
+"tableau.pl",
+#"gage_matrix_ops.pl",
+"PGinfo.pl",
+"source.pl",
+"PGcourse.pl",
+);
+
+TEXT(beginproblem());
+TEXT($BEGIN_ONE_COLUMN);
+$showPartialCorrectAnswers = 1;
+
+INITIALIZE_QUICK_MATRIX_ENTRY();
+
+$money_total = 6000;
+$time_total  = 600;
+
+# Bill
+$bill_money_commitment = 5000; #dollars
+$bill_time_commitment  = 400;  # hours
+$bill_profit = 4700;
+# Steve
+$steve_money_commitment = 3000;
+$steve_time_commitment  = 500;
+$steve_profit = 4500;
+
+
+#Hack to prevent domain conflict in answer.
+Context()->variables->add(p1=>'Real',p2=>'Real');
+$objfun1 = Formula("${bill_profit}p1 + ${steve_profit}p2");
+# why can't the formula be defined within context "linearInequality"?
+
+Context("LinearInequality");
+Context()->variables->add(p1=>'Real',p2=>'Real');
+Context()->strings->add("Essay Answer" =>{});
+Context()->strings->add('Minimize'=>{},'Maximize'=>{}, "?"=>{});
+Context()->strings->add('Yes'=>{},'No'=>{});
+Context()->flags->set({tolType=>"absolute",tolerance=>.001});
+Context()->flags->set(
+	zeroLevel=>0.001,
+	zeroLevelTol=>.001
+);
+# $objfun1 = Formula("${bill_profit}p1 + ${steve_profit}p2");
+
+our $context=Context();
+
+
+sub update_tableau {
+	my $original_matrix = shift;
+	my $basis           = shift;
+	# $basis is a Set object
+	# last row is numbered $basis_size+1;
+	my $basis_size=@{$basis->data};
+	my $basis_matrix = $original_matrix->submatrix(rows=>[1..$basis_size],columns=>($basis->data));
+	my $context=Context();
+	my $det = 1; #Real($basis_matrix->det);
+	$det = Real($basis_matrix->det);
+	$det = $det->value;
+	$det=Real(130000); #Real(1300000);
+	DEBUG_MESSAGE("det = $det ", ref($det));
+	my $basis2= Matrix($basis_matrix);
+	#DEBUG_MESSAGE(($basis2->det)*($basis2->inverse) *$original_matrix->row_slice(1..$basis_size), $PAR);
+	my $obj_coeff = - ($original_matrix->row($basis_size+1));
+	#obj function coeff corresponding to basis variables/columns
+	$cB = Matrix($obj_coeff->column_slice($basis->data));
+	# get A | S |b portion of tableau and multiply by det(B)B^-1
+	my $current_matrix= ($det)*($basis_matrix->inverse)*($original_matrix->row_slice(1..$basis_size));
+	my $new_obj_row = ($cB*$current_matrix)->row(1) - ($det)*($obj_coeff);
+	my $current_tableau = Matrix(@{$current_matrix->extract_rows},Matrix($new_obj_row));
+	return $current_tableau;
+}
+# the full tableau has one more row -- the objective function
+sub display_tableau_state {
+	my ($original_matrix,$tableau, $matrix, $basis,$pivot)= @_;
+	$basis = $basis->sort;
+	my $basis_size = @{$basis->data} ;
+	my $basis_matrix = matrix_from_submatrix($original_matrix, rows=>[1..$basis_size],columns=>$basis->data);
+	my $normalized_tableau = $matrix;
+	my $reduced_matrix = matrix_from_matrix_rows($matrix,1..$basis_size);
+	warn "basis matrix is $basis_matrix, $reduced_matrix";
+	my $normalized_reduced_matrix = ($basis_matrix->det)*$reduced_matrix;
+	# calculate current tableau by multiplying by the inverse of the basis
+	my $obj_coeff = - $original_matrix->row($basis_size+1);
+	my $cB = Matrix($obj_coeff->column_slice($basis->data));
+	my $current_matrix = ($basis_matrix->det)*($basis_matrix->inverse)*matrix_from_matrix_rows($original_matrix,1..$basis_size);
+	my $new_obj_row = ($cB*$current_matrix)->row(1) - ($basis_matrix->det)*($obj_coeff);
+	my $current_tableau = Matrix(@{$current_matrix->extract_rows},Matrix($new_obj_row));
+	$current_tableau = update_tableau($original_matrix, $basis);
+	
+	#DEBUG_MESSAGE("get state variables for $matrix using basis $basis");
+	@statevars1 = get_tableau_variable_values($matrix, $basis);
+	# get z value
+	$statevars1 = ~~@statevars1;
+	$state = Matrix([[@statevars1]]);
+
+
+	return "
+	<font size='-2'>
+	pivot: \($pivot\) basis: \( $basis\) $PAR  basis matrix \(".
+	display_matrix_mm($basis_matrix)."\) $PAR
+	tableau and normalized current tableau   $PAR
+	 \(" . lp_display_mm($tableau) . "\)\(".lp_display_mm($normalized_tableau). " \) $PAR 
+	original matrix and current matrix calculated by Binverse*original $PAR
+	\(".
+	display_matrix_mm(matrix_from_matrix_rows($original_matrix,1..$basis_size)).
+	"\)  \(".
+	display_matrix_mm($current_matrix).
+	"\)  $PAR
+	objective coefficients = \( $obj_coeff \) $PAR
+	basis objective_coefficients = \($cB\) $PAR
+	new tableau \[".
+	lp_display_mm($current_tableau).
+	"\]  $PAR
+	state:  \($state)\)  $PAR
+	</font>"
+}
+
+
+#### problem starts here:
+
+Context($context);
+$ra_matrix = [[-1,-$bill_money_commitment,-$bill_time_commitment, -1, 0, 	1,0,0,0,-$bill_profit], 
+                 [-1,-$steve_money_commitment,-$steve_time_commitment, 0, -1, 0,1,0,0,-$steve_profit],
+                 [1,0,0,0,0,0,0,0,1,0]];
+
+#                [0,$money_total,$time_total,1,1,0,0,1,0,0]];
+$original_matrix = Matrix($ra_matrix);
+
+$ra_matrix1 = lp_clone($ra_matrix);
+Context()->texStrings;
+BEGIN_TEXT
+basis(6,7) $BR
+\[\{lp_display_mm($ra_matrix1)\}\] $PAR
+\{lp_pivot($ra_matrix1,0,0),''\}$BR pivot(1,1) basis(1,7)$PAR
+\[\{lp_display_mm($ra_matrix1)\}\] $PAR
+\{lp_pivot($ra_matrix1,1,1),''\}$BR pivot(2,2), basis(1,2) $PAR
+\[\{lp_display_mm($ra_matrix1)\}\] $PAR
+\{lp_pivot($ra_matrix1,0,2),''\}$BR pivot(1,3), basis(2,3) $PAR
+\[\{lp_display_mm($ra_matrix1)\}\] $PAR
+END_TEXT
+
+
+$basis2_3_string = update_tableau($original_matrix, Set(2,3));
+
+
+BEGIN_TEXT
+update tableau method $PAR
+basis(6,7)$BR
+\[ \{ update_tableau($original_matrix, Set(6,7))  \} \] $PAR
+basis(1,7) $BR
+\[ \{ update_tableau($original_matrix, Set(1,7))  \} \] $PAR
+basis(1,2) $BR
+\[ \{ update_tableau($original_matrix, Set(1,2))  \} \] $PAR
+basis(2,4) $BR
+\[ \{ update_tableau($original_matrix, Set(2,4) )  \} \] $PAR
+basis(2,3) $BR
+\[  $basis2_3_string  \] $PAR
+basis(2,3) $BR
+\[  $basis2_3_string  \] $PAR
+\[ update_tableau($original_matrix, Set(2,3)\]
+END_TEXT
+Context()->normalStrings;
+TEXT($END_ONE_COLUMN);
+ENDDOCUMENT();
