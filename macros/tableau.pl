@@ -59,6 +59,20 @@ The structure of the tableau is:
 
 =cut
 
+
+=item tableauEquivalence 
+
+	ANS( $tableau->cmp(checker=>tableauEquivalence()) ); 
+	
+ # Note: it is important to include the () at the end of tableauEquivalence
+ 
+ # tableauEquivalence is meant to compare two matrices up to
+ # reshuffling the rows and multiplying each row by a constant.
+ # E.g. equivalent up to multiplying on the left by a permuation matrix 
+ # or a (non-uniformly constant) diagonal matrix
+ 
+=cut
+
 =item  get_tableau_variable_values
  
 	Parameters: ($MathObjectMatrix_tableau, $MathObjectSet_basis)
@@ -181,18 +195,16 @@ sub _tableau_init {};   # don't reload this file
 
 loadMacros("tableau_main_subroutines.pl");
 
-# tableauEquivalence is meant to compare two matrices up 
-# reshuffling the rows and multiplying each row by a constant.
-# E.g. equivalent up to multiplying on the left by permuation matrix 
-# or a (non-uniformly constant) diagonal matrix
-#useage tableauEquivalence
-# $tableaus_are_equal = 
-#List($tableau1->extract_rows)->cmp(checker=>tableauEquivalence)
-#     ->evaluate(List($tableau2->extract_rows))->score :
+
+=head4 Subroutines added to the main:: Package
+
+
+=cut
 
 sub tableauEquivalence {
 	return sub {
 		my ($correct, $student, $ansHash) = @_;
+		# DEBUG_MESSAGE("executing tableau equivalence");
 		# convert matrices to arrays of row references
 		my @rows1 = matrix_extract_rows($correct);
 		my @rows2 = matrix_extract_rows($student);
@@ -208,15 +220,18 @@ sub tableauEquivalence {
 		)->evaluate(List(@rows2))->{score};
 		return $score;
 	}
-	# this function returns a subroutine to be inserted 
-	# into $tableau->cmp(checker=>tableauEquivalence)
  }
 
+=item linebreak_at_commas
+	
+	Useage: 
+	
+	$foochecker =  $constraints->cmp()->withPostFilter(
+ 		linebreak_at_commas()
+ 	);
 
-# Useage linebreak_at_commas
-# $foochecker =  $constraints->cmp()->withPostFilter(
-# 	linebreak_at_commas()
-# );
+=cut
+
 
 sub linebreak_at_commas {
 	return sub {

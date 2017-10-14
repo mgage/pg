@@ -1,0 +1,79 @@
+##############################################
+DOCUMENT();
+
+loadMacros(
+   "PGstandard.pl",     # Standard macros for PG language
+   "MathObjects.pl",
+   "parserLinearInequality.pl",
+   "PGML.pl",
+   "tableau.pl",
+   "PGmatrixmacros.pl",
+   "LinearProgramming.pl",
+    #"source.pl",        # allows code to be displayed on certain sites.
+   "PGcourse.pl",
+);
+
+##############################################
+
+Context("Matrix");  # need Matrix context to allow string input into Matrix. 
+
+$m = Matrix("[[3,6,7],[2,1,8],[4,6,21],[-6,7,9]]");
+$constraint_matrix = Matrix("
+[[ 0, 0, -1, -1],
+ [-1, -1, 0, 0 ],
+ [1, 0 , 1 , 0],
+ [0, 1, 0, 1]]
+");
+
+#TEXT ("created ". ref($m));
+#what are the best ways to display a matrix?
+
+$m1 = $m->row_slice([4,1]);
+$m2 = $m->column_slice([3,2,1]);
+
+$list = $m->extract_rows_to_list(2,3);
+
+$b = Matrix([1, 2, 3, 4])->transpose; # make it an n by 1 matrix
+$c = Matrix([5, 6, 7]);
+$t = Tableau->new(A=>$m,b=>$b, c=>$c);
+
+$c_4 = $t->current_tableau;
+##############################################################
+#
+#  Text
+#
+#
+
+Context()->texStrings;
+
+# tableau is \[$c_4\] $PAR
+# 
+# inline tableau is \[\{ $t->current_tableau  \}\]
+# 
+# tableau->{M}   is \[\{ $t->{M}  \}\]
+# 
+# $PAR
+# Enter tableau->{M} \{$t->{M}->ans_array\}
+
+BEGIN_TEXT
+m is \[$m\]
+
+$PAR
+enter m = \{$m->ans_array\}
+
+\{#$m->cmp->evaluate($m)->pretty_print\}
+
+END_TEXT
+Context()->normalStrings;
+
+
+##############################################################
+#
+#  Answers
+#
+#
+#ANS($t->{M}->cmp(checker=>tableauEquivalence()) );
+ANS($m->cmp(checker=>tableauEquivalence()));
+
+
+ENDDOCUMENT();        # This should be the last executable line in the problem.
