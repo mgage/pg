@@ -1,0 +1,206 @@
+##DESCRIPTION
+
+
+
+##ENDDESCRIPTION
+
+
+DOCUMENT();        # This should be the first executable line in the problem.
+
+loadMacros(
+   "PGstandard.pl",     # Standard macros for PG language
+   "MathObjects.pl",
+	"MatrixReduce.pl",
+	#"AppletObjects.pl",
+	"PGessaymacros.pl",
+	"PGmatrixmacros.pl",
+	"PGML.pl",
+	"LinearProgramming.pl",
+	"parserLinearInequality.pl",
+	"quickMatrixEntry.pl",
+	#"scaffold.pl",
+	"tableau.pl",
+	#"gage_matrix_ops.pl",
+	"PGinfo.pl",
+	"source.pl",
+	"PGcourse.pl",
+);
+
+TEXT(beginproblem());
+$showPartialCorrectAnswers = 1;
+
+##############################################################
+#
+#  Setup
+#
+#
+Context("Matrix");
+
+Context()->flags->set(
+	zeroLevel=>0.001,
+	zeroLevelTol=>.001
+);
+INITIALIZE_QUICK_MATRIX_ENTRY();
+
+$money_total = 6000;
+$time_total  = 600;
+
+# Bill
+$bill_money_commitment = 5000; #dollars
+$bill_time_commitment  = 400;  # hours
+$bill_profit = 4700;
+# Steve
+$steve_money_commitment = 3000;
+$steve_time_commitment  = 500;
+$steve_profit = 4500;
+
+
+#constraint matrix
+$A = Matrix([[-1,-$bill_money_commitment,-$bill_time_commitment, -1, 0],
+             [ -1,-$steve_money_commitment,-$steve_time_commitment, 0, -1, ]]);
+$b = Matrix([[-$bill_profit,-$steve_profit]])->transpose;
+$c = Matrix([1,0,0,0,0]);
+
+$tableau1 = Tableau->new(A=>$A, b=>$b,  c=>$c);
+$m = $tableau1->{M};
+$m2 = $tableau1->{current_constraint_matrix};
+$tableau_orig = $tableau1->current_tableau;
+$basis_orig = $tableau1->basis;
+#HR
+$tableau1->basis(1,2);
+$m3 = $tableau1->{M};
+$m4 = $tableau1->{current_constraint_matrix};
+$tableau_orig3 = $tableau1->current_tableau;
+$basis_orig3 = $tableau1->basis;
+#HR
+$tableau1->basis(6,7);
+$t1 = $tableau1->current_tableau;
+($index1, $value1, $feasible1) = $tableau1->find_short_cut_row();
+($index2, $value2, $infeasible2) = $tableau1->find_short_cut_column(1); 
+# search row 1
+($index3, $value3) = $tableau1->find_leaving_column(1);
+$basis17 = $tableau1->find_next_basis_from_pivot(1,1);
+$basis17=Set($basis17)->sort ;
+
+$tableau1->basis($basis17->value);  # basis should be able to accept Set and List objects
+$basis17check = $tableau1->basis;
+$tableau17= $tableau1->current_tableau;
+$matrix17 = $tableau1->{current_constraint_matrix}; #  M = A | S |b
+
+#HR last part of phase 1
+($index11, $value11, $feasible11) = $tableau1->find_short_cut_row();
+
+#HR first pivot of phase2
+($pivot1col, $value1c, $optimum1a) = $tableau1->find_pivot_column('min');
+($pivot1row, $value1r, $unbounded1a) = $tableau1->find_pivot_row(2);
+#($row2,$col2,$optimum2,$unbounded2)   = $tableau1->find_next_pivot('min');
+#$basis2 = $tableau1->find_next_basis_from_pivot($row2, $col2);
+#TEXT("basis2 has type ".ref($basis2));
+#$tableau1->basis($basis2->value);
+#$tableaudisplay1 = $tableau1->current_tableau;
+
+#HR second pivot of phase2
+#($pivot3col, $value3c, $optimum3a) = $tableau1->find_pivot_column('min');
+#($pivot3row, $value3r, $unbounded3a) = $tableau1->find_pivot_row(3);
+#($row3,$col3,$optimum3,$unbounded3) = $tableau1->find_next_pivot('min');
+#$basis3 = $tableau1->find_next_basis_from_pivot($row3, $col3);
+#$tableau1->basis($basis3->value);
+#$tableaudisplay2 = $tableau1->current_tableau;
+
+#HR third pivot of phase2
+#($pivot4col, $value4c, $optimum4a) = $tableau1->find_pivot_column('min');
+#($pivot4row, $value4r, $unbounded4a) = $tableau1->find_pivot_row(3);
+#($row4,$col4,$optimum4,$unbounded4) = $tableau1->find_next_pivot('min');
+#optimum is reached so can't go forward from here
+#$basis4 = $tableau1->find_next_basis_from_pivot($row4, $col4);
+#$tableau1->basis($basis4->value);
+#$tableaudisplay3 = $tableau1->current_tableau;
+
+### experimental
+# basis calculation
+TEXT(" start with basis (6,7) and pivot on (1,1)");
+	$basis = Set(6,7);
+ 	$basis = $basis - Set(6);
+ 	$basis = List( 1, $basis->value,  );
+TEXT( "new basis is $basis");
+
+##############################################################
+#
+#  Text
+#
+#
+
+Context()->texStrings;
+BEGIN_TEXT
+matrix: \[ $m  \quad $m2 \] $PAR
+tableau: \[ $tableau_orig \] $PAR
+original basis: $basis_orig $PAR
+$HR
+matrix: \[ $m3  \quad $m4 \] $PAR
+tableau: \[ $tableau_orig3 \] $PAR
+new basis: $basis_orig3 $PAR
+$HR
+\[ $t1\]
+find shortcut row: (index, value, feasible) = ($index1, $value1, $feasible1) $PAR
+Since it is not feasible yet we'll search row 1 for a short cut pivot $PAR
+find shortcut column: (index, value, infeasible) = ($index2, $value2, $infeasible2) $PAR
+find leaving_column for row 1: (col_index,value) = ($index3, $value3) $PAR
+find new basis from pivot at (1,1): \($basis17\) $PAR
+check basis: ($basis17check), \($basis17check\) $PAR 
+tableau17, matrix17: \[ $tableau17 \qquad $matrix17 \] $PAR
+$HR
+last part of phase 1 $PAR
+find shortcut row: (row $index11,value $value11,feasible $feasible11) $PAR
+since the tableau is now feasible we move on to phase2
+$HR
+
+first pivot of phase 2: $PAR
+find pivot col ($pivot1col, $value1c, $optimum1) $PAR
+find pivot row ($pivot1row, $value1r, $unbounded1) $PAR
+next pivot:(row  col  optimum  unbounded)=
+( \{join(",",$tableau1->find_next_pivot('min'))\} ) 
+ $PAR
+next basis: (\{$tableau1->basis(
+$tableau1->find_next_basis_from_pivot(
+($tableau1->find_next_pivot('min'))[0], 
+($tableau1->find_next_pivot('min'))[1]
+)->value
+)\}) $PAR
+new tableau: $PAR
+\[ \{ $tableau1->current_tableau \} \]$PAR
+
+$HR
+
+second pivot of phase2: $PAR
+next pivot:(row  col  optimum  unbounded)=
+( \{join(",",$tableau1->find_next_pivot('min'))\} ) 
+ $PAR
+next basis: (\{$tableau1->basis(
+$tableau1->find_next_basis_from_pivot(
+($tableau1->find_next_pivot('min'))[0], 
+($tableau1->find_next_pivot('min'))[1]
+)->value
+)\}) $PAR
+new tableau: $PAR
+\[ \{ $tableau1->current_tableau \} \]$PAR
+
+$HR
+
+third pivot of phase2: $PAR
+next pivot:(row  col  optimum  unbounded)=
+( \{join(",",$tableau1->find_next_pivot('min'))\} ) 
+optimum so we stop here
+
+END_TEXT
+Context()->normalStrings;
+
+
+##############################################################
+#
+#  Answers
+#
+#
+
+
+
+ENDDOCUMENT();        # This should be the last executable line in the problem.

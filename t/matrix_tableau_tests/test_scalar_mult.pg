@@ -36,21 +36,25 @@ Context("Matrix");
 #
 #
 
-#$m = Matrix([[0,1,0,0,0,0,0,0,0,0.423077],[0.00153846,0,1,-0.00230769,0.00384615,0.00230769,-0.00384615,0,0,6.46154]]);
+
+# in the current develop branch (10/14/2017) there should be no errors generated.
+
+
+$m = Matrix([[0,1,0,0,0,0,0,0,0,0.423077],[0.00153846,0,1,-0.00230769,0.00384615,0.00230769,-0.00384615,0,0,6.46154]]);
 $c = Real(1300000); # this gives "can't convert a Real Number to a Matrix" when executed inside texStrings mode;
 # $c = Real(130000); # this works
 #$c = Real(1300000)->value; # this also works
-$m = Matrix([[1,2],[3,4]]);
+#$m = Matrix([[1,2],[3,4]]);
 
 $string = $c*$m;  # this does not cause errors.
 
 Context()->texStrings;
-#$string = $c*$m;  # this causes errors.
+$string = $c*$m;  # this causes errors.
 BEGIN_TEXT
 
 \[ $string \] $PAR
 
-\[\{ $c*$m  # this causes errors  if you remove this comment \} \]
+\[\{ $c*$m \} \]
 
 END_TEXT
 Context()->normalStrings;
