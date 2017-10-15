@@ -276,6 +276,8 @@ sub new {
 		B => undef,  # square invertible matrix corresponding to the current basis columns
 		M => undef,  # matrix of consisting of all columns and all rows except for the objective function row
 		current_constraint_matrix=>undef,
+		current_coeff=>undef,
+		current_b => undef,
 		obj_col_index => undef, # an array reference indicating the columns (e.g 1 or n+m+1) for the objective value or values
 		constraint_labels => undef,
 		problem_var_labels => undef, 
@@ -308,13 +310,15 @@ sub initialize {
 	# main::DEBUG_MESSAGE("m $m, n $n");
 	$self->{S} = Value::Matrix->I($m);
 	$self->{basis} = [($n+1)...($n+$m)] unless ref($self->{basis})=~/ARRAY/;
+	
 	my @rows = $self->assemble_matrix;
 	# main::DEBUG_MESSAGE("rows", map {ref($_)?$_->value :$_} map {@$_} @rows);
-	$self->{M} = _Matrix([@rows]);
+	$self->{M} = _Matrix([@rows]); #original matrix
 	$self->{current_constraint_matrix}= $self->{M};
 	$self->{data}= $self->{M}->data;
 	$self->{B} = $self->{M}->submatrix(rows=>[1..($self->{m})],columns=>$self->{basis});
 	$self->{obj_row} = _Matrix(@{$self->objective_row()});
+	$self->basis($self->basis()->value);
 	return();	
 }
 		
@@ -349,27 +353,35 @@ sub objective_row {
 	return \@last_row;
 }
 
-# return a matrix containing the entire tableau
+=item current_tableau
+
+	Useage:
+		$MathObjectmatrix = $self->current_tableau
+		$MathObjectmatrix = $self->current_tableau(3,4) #updates basis to (3,4)
+		
+=cut
 sub current_tableau {
 	my $self = shift;
+	my @basis = @_;
+	if (@basis) {
+		$self->basis(@basis);
+	}
 	# find the coefficients associated with the basis columns
 	my $c_B  = $self->{obj_row}->extract_columns($self->{basis} );
 	my $c_B2 = Value::Vector->new([ map {$_->value} @$c_B]);
-	my $current_constraint_matrix = $self->{current_constraint_matrix};
-	my $B = $self->{B};
+#	my $current_constraint_matrix = $self->{current_constraint_matrix};
+#	my $B = $self->{B};
 	#main::DEBUG_MESSAGE( "basis: current_constraint_matrix $current_constraint_matrix");
 	#main::DEBUG_MESSAGE( "current_tableau: matrix is $current_constraint_matrix");
 	#main::DEBUG_MESSAGE( "current_basis matrix: $B");
-	my $correction_coeff = ($c_B2*($self->{current_constraint_matrix}) )->row(1);
+#	my $correction_coeff = ($c_B2*($self->{current_constraint_matrix}) )->row(1);
 	# subtract the correction coefficients from the obj_row
 	# this essentially extends Gauss reduction applied to the obj_row
-	#my $B = $self->{B};
-	#main::DEBUG_MESSAGE( "det is $B det=", $self->{B}->det->value);
-	my $obj_row_normalized =  abs($self->{B}->det->value)*$self->{obj_row};
+#	my $obj_row_normalized =  abs($self->{B}->det->value)*$self->{obj_row};
 	#main::DEBUG_MESSAGE(" normalized obj row ",$obj_row_normalized->value);
 	#main::DEBUG_MESSAGE(" correction coeff ", $correction_coeff->value);
-	my $current_coeff = $obj_row_normalized-$correction_coeff ;
-	$self->{current_coeff}= $current_coeff; 
+#	my $current_coeff = $obj_row_normalized-$correction_coeff ;
+#	$self->{current_coeff}= $current_coeff; 
 
 	#main::DEBUG_MESSAGE("subtract these two ", (($self->{B}->det) *$self->{obj_row}), " | ", ($c_B*$current_tableau)->dimensions);
 	#main::DEBUG_MESSAGE("all coefficients", join('|', $self->{obj_row}->value ) );
@@ -397,7 +409,10 @@ sub basis {
 	} else { # input is assumed to be an array
 		$new_basis = \@input;
 	}
-	$self->{basis}= $new_basis;
+	$self->{basis}= $new_basis;  # this should always be an ARRAY
+	WARN_MESSAGE("basis $new_basis was not stored as an array reference") 
+	     unless ref($new_basis)=~/ARRAY/;
+	
 	
 	$self->{B} = $self->{M}->submatrix(rows=>[1..($self->{m})],columns=>$self->{basis});
 	my $B = $self->{B};
@@ -406,13 +421,15 @@ sub basis {
 	my $M = $self->{M};
 	my ($row_dim, $col_dim) = $M->dimensions;
 	my $current_constraint_matrix = $Badj*$M;
-	$self->{data} = $current_constraint_matrix->data;
-	$self->{current_constraint_matrix} = $current_constraint_matrix; 
 	my $c_B  = $self->{obj_row}->extract_columns($self->{basis} );
 	my $c_B2 = Value::Vector->new([ map {$_->value} @$c_B]);
-	my $correction_coeff = ($c_B2*($self->{current_constraint_matrix}) )->row(1); 
+	my $correction_coeff = ($c_B2*($current_constraint_matrix) )->row(1); 
 	my $obj_row_normalized =  abs($self->{B}->det->value)*$self->{obj_row};
 	my $current_coeff = $obj_row_normalized-$correction_coeff ;
+	# updates
+	$self->{B}= $B;
+	$self->{data} = $current_constraint_matrix->data;
+	$self->{current_constraint_matrix} = $current_constraint_matrix; 
 	$self->{current_coeff}= $current_coeff; 
 	$self->{current_b} = $current_constraint_matrix->column($col_dim);
 	 # the A | S | obj | b
@@ -445,9 +462,10 @@ sub find_pivot_column {
 		Value::Error( "The optimization method must be 
 		'max' or 'min'. |$max_or_min| is not defined.");
 	}
-	#FIXME is this a 1 by n or an n dimensional matrix??
 	my $obj_row_matrix = $self->{current_coeff};
-	my $obj_col_dim = $obj_row_matrix->dimensions;
+	#FIXME $obj_row_matrix is this a 1 by n or an n dimensional matrix??
+	my ($obj_col_dim) = $obj_row_matrix->dimensions;
+	my $obj_row_dim   = 1;
 	$obj_col_dim=$obj_col_dim-2;
 	#sanity check row	
 	if (not defined($obj_row_index) ) {
@@ -459,14 +477,13 @@ sub find_pivot_column {
 	
 
 	my @obj_row = @{$obj_row_matrix->extract_rows($obj_row_index)};
-	my $index = undef;
+	my $index = -1;
 	my $optimum = 1;
 	my $value = undef;
- 	main::DEBUG_MESSAGE(" coldim: $obj_col_dim , 
- 	    row: $obj_row_index obj_matrix: $obj_row_matrix ",ref($obj_row_matrix) );
- 	main::DEBUG_MESSAGE(" \@obj_row ",  join(' ', @obj_row ) );
+# 	main::DEBUG_MESSAGE(" coldim: $obj_col_dim , row: $obj_row_index obj_matrix: $obj_row_matrix ".ref($obj_row_matrix) );
+# 	main::DEBUG_MESSAGE(" \@obj_row ",  join(' ', @obj_row ) );
 	for (my $k=1; $k<=$obj_col_dim; $k++) {
-		main::DEBUG_MESSAGE("find pivot column: k $k, ", $obj_row_matrix->element($k)->value);
+#		main::DEBUG_MESSAGE("find pivot column: k $k, " .$obj_row_matrix->element($k)->value);
 		if ( ($obj_row_matrix->element($k) < 0 and $max_or_min eq 'max') or 
 		     ($obj_row_matrix->element($k) > 0 and $max_or_min eq 'min') ) {
 		    $index = $k; #memorize index
@@ -499,17 +516,17 @@ sub find_pivot_row {
 	unless (1<=$column_index and $column_index <= $col_dim) {
 		Value::Error( "Column index must be between 1 and $col_dim" );
 	}
-	main::DEBUG_MESSAGE("dim = ($row_dim, $col_dim)");
+	# main::DEBUG_MESSAGE("dim = ($row_dim, $col_dim)");
 	my $value = undef;
-	my $index = undef;
+	my $index = -1;
 	my $unbounded = 1;
 	for (my $k=1; $k<=$row_dim; $k++) {
 	    my $m = $self->{current_constraint_matrix}->element($k,$column_index);
-	    main::DEBUG_MESSAGE(" m[$k,$column_index] is ", $m->value);
+	    # main::DEBUG_MESSAGE(" m[$k,$column_index] is ", $m->value);
 		next if $m <=0;
 		my $b = $self->{current_b}->element($k,1);
-		main::DEBUG_MESSAGE(" b[$k] is ", $b->value);
-		main::DEBUG_MESSAGE("finding pivot row in column $column_index, row: $k ", ($b/$m)->value);	
+		# main::DEBUG_MESSAGE(" b[$k] is ", $b->value);
+		# main::DEBUG_MESSAGE("finding pivot row in column $column_index, row: $k ", ($b/$m)->value);	
 		if ( not defined($value) or $b/$m < $value) {
 			$value = $b/$m;
 			$index = $k; # memorize index
@@ -630,6 +647,32 @@ sub find_short_cut_column {
 =cut
 
 
+=item find_next_basis 
+
+	($row, $col,$optimum,$unbounded) = $self->find_next_basis (max/minm row_num)
+
+=cut 
+
+
+sub find_next_basis {
+	my $self = shift;
+	my $max_or_min = shift;
+	my $row_num = shift;
+	my ( $row_index, $col_index, $optimum, $unbounded)= 
+	     $self->find_next_pivot($max_or_min, $row_num);
+	my $flag;
+	my $basis;
+	if ($optimum or $unbounded) {
+		$basis=$self->basis();
+	} else {
+		$flag = '';
+		$basis =$self->find_next_basis_from_pivot($row_index,$col_index);
+		
+	}
+	return( $basis->value, $optimum,$unbounded );
+	
+}
+
 =item find_next_pivot
 
 	($row, $col,$optimum,$unbounded) = $self->find_next_pivot (max/minm row_num)
@@ -647,13 +690,13 @@ sub find_next_pivot {
 	my $row_num =shift;
 
 	# sanity check max or min in find pivot column
-	my ($col_index, $value, $row_index, $optimum, $unbounded) = (undef,undef,undef,undef);
+	my ($col_index, $value, $row_index, $optimum, $unbounded) = ('','','','');
 	($col_index, $value, $optimum) = $self->find_pivot_column($max_or_min, $row_num);
-	main::DEBUG_MESSAGE("find_next_pivot: col: $col_index, value: $value opt: $optimum ");
+#	main::DEBUG_MESSAGE("find_next_pivot: col: $col_index, value: $value opt: $optimum ");
 	return ( $row_index, $col_index, $optimum, $unbounded) if $optimum;
 	($row_index, $value, $unbounded) = $self->find_pivot_row($col_index);
-	main::DEBUG_MESSAGE("find_next pivot row: $row_index, value: $value unbound: $unbounded");
-	return ( $row_index, $col_index, $optimum,$unbounded);
+#	main::DEBUG_MESSAGE("find_next pivot row: $row_index, value: $value unbound: $unbounded");
+	return($row_index, $col_index, $optimum, $unbounded);
 }
 	
 
@@ -673,11 +716,11 @@ sub find_next_basis_from_pivot {
 	# sanity check max or min in find pivot column
  	my $basis = main::Set($self->{basis});	
  	my ($leaving_col_index, $value) = $self->find_leaving_column($row_index);
- 	$basis = $basis - main::Set($leaving_col_index);
- 	main::DEBUG_MESSAGE( "basis is $basis, leaving index $leaving_col_index
- 	    entering index is $col_index");
- 	$basis = [$basis->value, main::Real($col_index)];
- 	return (main::List($basis));
+ 	$basis = main::Set( $basis - main::Set($leaving_col_index) + main::Set($col_index));
+ 	# main::DEBUG_MESSAGE( "basis is $basis, leaving index $leaving_col_index
+ 	#    entering index is $col_index");
+ 	#$basis = [$basis->value, main::Real($col_index)];
+ 	return ($basis);
 } 
 
 
