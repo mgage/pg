@@ -135,18 +135,30 @@ matrix: \[ $m  \quad $m2 \] $PAR
 tableau: \[ $tableau_orig \] $PAR
 original basis: $basis_orig $PAR
 $HR
-new basis (3,2) 
+ 
 \[\{ $tableau1->current_tableau\}\]
 basis \{$tableau1->basis()\} ,\{List($tableau1->{basis})\} $PAR
-basis matrix \[\{$tableau1->{current_constraint_matrix}->
+basis matrix \[\{$tableau1->{M}->
     submatrix(rows=>[1..($tableau1->{m})],columns=>$tableau1->{basis})\}\];
 $PAR
 new basis (2,3) 
 \[\{$tableau1->current_tableau(2,3)\}\]
-basis \{$tableau1->basis()\},  \{List($tableau1->{basis})\}$PAR
-basis matrix \[\{$tableau1->{current_constraint_matrix}->submatrix(rows=>[1..($tableau1->{m})],columns=>$tableau1->{basis})\}\];
+basis \{$tableau1->basis()\},  \{join(",",@{$tableau1->{basis}})\}$PAR
+basis matrix \[\{$tableau1->{M}->submatrix(rows=>[1..($tableau1->{m})],columns=>$tableau1->{basis})\}\];
 $PAR
+new basis (3,2) 
+\[\{$tableau1->current_tableau(3,2)\}\]
+basis \{$tableau1->basis()\},  \{join(",",@{$tableau1->{basis}})\}$PAR
+basis matrix \[\{$tableau1->{M}->submatrix(rows=>[1..($tableau1->{m})],columns=>$tableau1->{basis})\}\];
 Should figure out why these don't reverse although internally they do.
+$HR
+submatrix (1,2) by (1,2)
+\[\{$tableau1->{M}->submatrix(rows=>[1,2],columns=>[1,2])\}\];
+\[\[\{$tableau1->{B}\}\];
+submatrix (1,2) by (2,1)
+
+\[\{$tableau1->{M}->submatrix(rows=>[1,2],columns=>[2,1])\}\];
+\[\[\{$tableau1->{B}\}\];
 $HR
 Figure out outputs: $PAR
 \[\{$tableau1->current_tableau(1,7) \} \]$PAR

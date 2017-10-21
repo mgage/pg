@@ -1,0 +1,109 @@
+DOCUMENT();  
+loadMacros(
+"PGstandard.pl",
+"MathObjects.pl",
+"PGmatrixmacros.pl",
+"niceTables.pl",
+"tableau.pl",
+"PGinfo.pl",
+"source.pl",
+"PGcourse.pl",
+);
+
+TEXT(beginproblem());
+TEXT($BEGIN_ONE_COLUMN);
+$showPartialCorrectAnswers = 1;
+
+
+$money_total = 6000;
+$time_total  = 600;
+
+# Bill
+$bill_money_commitment = 5000; #dollars
+$bill_time_commitment  = 400;  # hours
+$bill_profit = 4700;
+# Steve
+$steve_money_commitment = 3000;
+$steve_time_commitment  = 500;
+$steve_profit = 4500;
+
+
+
+#### problem starts here:
+               
+# need error checking to make sure that tableau->new checks
+# that inputs are matrices
+
+$A = Matrix([[-$bill_money_commitment,-$bill_time_commitment, -1, 0],
+             [ -$steve_money_commitment,-$steve_time_commitment, 0, -1 ]]);
+$b = Vector([-$bill_profit,-$steve_profit]); # need vertical vector
+$c = ColumnVector([$money_total,$time_total,0,0]);
+
+BEGIN_TEXT
+A => $A $PAR
+b => $b $PAR
+c => $c $PAR
+END_TEXT
+# $c = Matrix([[$money_total,$time_total,0,0],[-1,0,0,0,0]]); 
+# not ready for multiple objective rows
+
+$tableau1 = Tableau->new(A=>$A, b=>$b,  c=>$c);
+# slack variables are automatically added
+
+
+
+$toprow = [qw(y1 y2 y3 y4 s1 s2 P b) ];
+$align  = "cccc|cc|c|c";
+	
+BEGIN_TEXT
+tableau is $BR \(\{$tableau1\}\)$BR
+tableau->current_tableau is $BR
+\(\{$tableau1->current_tableau\}\)$BR
+tableau {current_constraint_matrix} $BR \(\{$tableau1->{current_constraint_matrix}\}\)$BR
+tableau {M} $BR \(\{$tableau1->{M}\}\) $BR
+current objective row coefficients of tableau $BR \(\{$tableau1->{current_coeff}\}\)$PAR
+lop_display() pretty prints the value of tableau->current_tableau with optional decorations.
+The usual decorations are an alignment scheme which allows one to add vertical lines
+and labels for the rows of the matrix (on the top).  The last row is automatically separated
+off as the line storing the (negative of) the objective coefficients. 
+
+lop_display(tableau) with no options set $BR
+\{lop_display($tableau1)\}$BR
+lop_display(tableau, alignment=>"$align", toplevel=>[qw(y1 y2 y3 y4 s1 s2 P b) ])$BR
+\{lop_display($tableau1,alignment=>$align,toplevel=>$toprow)\}$PAR
+
+ok?
+$HR
+$PAR
+
+$PAR
+END_TEXT
+
+BEGIN_TEXT
+$PAR
+OTHER RANDOM TESTS
+$PAR
+
+obj row \{$tableau1->{current_coeff}\}
+$PAR
+tableau looks like \{pretty_print( $tableau1 )\}
+
+
+
+
+
+$PAR
+with datatable 
+$PAR
+\{DataTable([@matrix,[[3,midrule=>1],2,0,0,0,0,1,0]], caption=>"Values",align=>"ccccc|cc|c|c") \}
+
+$PAR
+\{LayoutTable([@matrix,[[3,midrule=>1],2,0,0,0,0,1,0]], caption=>"Values",align=>"ccccc|cc|c|c") \}
+
+$PAR
+\{DataTable( [[1,2,3],[4,5,6]], caption=>"Values") \}
+
+END_TEXT
+Context()->normalStrings;
+TEXT($END_ONE_COLUMN);
+ENDDOCUMENT();

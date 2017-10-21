@@ -108,7 +108,7 @@ Used most often when $constraints is a LinearInequality math object.
 
 =item  Tableau->new(A=>Matrix, b=>Vector or Matrix, c=>Vector or Matrix)
 
-	A => undef, # constraint matrix  MathObjectMatrix
+	A => undef, # original constraint matrix  MathObjectMatrix
 	b => undef, # constraint constants Vector or MathObjectMatrix 1 by n
 	c => undef, # coefficients for objective function Vector or MathObjectMatrix 1 by n
 	obj_row => undef, # contains the negative of the coefficients of the objective function.
@@ -116,13 +116,21 @@ Used most often when $constraints is a LinearInequality math object.
 	n => undef, # dimension of problem variables (columns in A)
 	m => undef, # dimension of slack variables (rows in A)
 	S => undef, # square m by m matrix for slack variables
-	basis => undef, # list describing the current basis columns corresponding to determined variables.
-	B => undef,  # square invertible matrix corresponding to the current basis columns
-	M => undef,  # matrix of consisting of all columns and all rows except for the objective function row 
-	obj_col_num => undef, 
-	current_constraint_matrix=>undef,
+	M => undef,  # matrix of consisting of all original columns and all 
+		rows except for the objective function row 
+	obj_col_num => undef,
+	basis => undef, # list describing the current basis columns corresponding 
+		to determined variables.
+	current_basis_matrix => undef,  # square invertible matrix 
+		corresponding to the current basis columns
+ 
+	current_constraint_matrix=>undef, # the current version of [A | S]
+	current_b,                        # the current version of the constraint constants b
+ #	current_basis_matrix              # (should be new name for B above
+ #                                    # a square invertible matrix corresponding to the 
+ #	                                  # current basis columns)
 	# flag indicating the column (1 or n+m+1) for the objective value
-	constraint_labels => undef,
+	constraint_labels => undef,   (not sure if this remains relevant after pivots)
 	problem_var_labels => undef, 
 	slack_var_labels => undef,
 
@@ -194,10 +202,16 @@ More references: L<lib/Matrix.pm>
 
 sub _tableau_init {};   # don't reload this file
 
-loadMacros("tableau_main_subroutines.pl");
+# loadMacros("tableau_main_subroutines.pl");
 
 
 =head4 Subroutines added to the main:: Package
+
+
+=cut
+
+=item tableauEquivalence
+
 
 
 =cut
@@ -247,6 +261,32 @@ sub linebreak_at_commas {
 		#DEBUG_MESSAGE("section4ans1 ", pretty_print($ans, $displayMode));
 		$ans;
 	};
+}
+
+=item linebreak_at_commas
+	
+	Useage: 
+	
+	lop_display($tableau, align=>'cccc|cc|c|c', toplevel=>[qw(x1,x2,x3,x4,s1,s2,P,b)])
+ 	
+Pretty prints the output of a matrix as a LOP with separating labels and 
+variable labels.
+
+=cut
+sub lop_display {
+	my $tableau = shift;
+	%options = @_;
+	$options{alignment} = ($options{alignment})? $options{alignment}:"|ccccc|cc|c|c|";
+	@toplevel = ();
+	if (exists( ($options{toplevel})) ) {
+		@toplevel = @{$options{toplevel}};
+		$toplevel[0]=[$toplevel[0],headerrow=>1, midrule=>1];
+	}
+	@matrix = $tableau1->current_tableau->value;
+	$last_row = $#matrix; # last row is objective coefficients 
+	$matrix[$last_row-1]->[0]=[$matrix[$last_row-1]->[0],midrule=>1];
+	$matrix[$last_row]->[0]=[$matrix[$last_row]->[0],midrule=>1];
+	DataTable([[@toplevel],@matrix],align=>$options{alignment}); 
 }
 
 
@@ -301,8 +341,8 @@ sub initialize {
 	unless (ref($self->{A}) =~ /Value::Matrix/ &&
 	        ref($self->{b}) =~ /Value::Vector|Value::Matrix/ && 
 	        ref($self->{c}) =~ /Value::Vector|Value::Matrix/){
-		main::WARN_MESSAGE("Error: Required inputs: Tableau(A=> Matrix, b=>Vector, c=>Vector)");
-		return;
+		Value::Error ("Error: Required inputs for creating tableau:\n". 
+		"Tableau(A=> Matrix, b=>ColumnVector or Matrix, c=>Vector or Matrix)");
 	}
 	my ($m, $n)=($self->{A}->dimensions);
 	$self->{n}=$self->{n}//$n;
@@ -316,7 +356,7 @@ sub initialize {
 	$self->{M} = _Matrix([@rows]); #original matrix
 	$self->{current_constraint_matrix}= $self->{M};
 	$self->{data}= $self->{M}->data;
-	$self->{B} = $self->{M}->submatrix(rows=>[1..($self->{m})],columns=>$self->{basis});
+	$self->{current_basis_matrix} = $self->{M}->submatrix(rows=>[1..($self->{m})],columns=>$self->{basis});
 	$self->{obj_row} = _Matrix(@{$self->objective_row()});
 	$self->basis($self->basis()->value);
 	return();	
@@ -327,6 +367,17 @@ sub assemble_matrix {
 	my @rows =();
 	my $m = $self->{m};
 	my $n = $self->{n};
+	# sanity check for b;
+	if (ref($self->{b}) =~/Vector/) {
+		# replace by n by 1 matrix
+		$self->{b}=Value::Matrix->new([[$self->{b}->value]])->transpose;
+	}
+	my ($constraint_rows, $constraint_cols) = $self->{b}->dimensions;
+	unless ($constraint_rows== $m and $constraint_cols == 1 ) {
+		Value::Error("constraint matrix b is $constraint_rows by $constraint_cols but should
+		be $m by 1 to match the constraint matrix A ");
+	}
+
 	foreach my $i (1..$m) {
 		my @current_row=();
 		foreach my $j (1..$n) {
@@ -346,10 +397,13 @@ sub assemble_matrix {
 
 sub objective_row {
 	my $self = shift;
+	# sanity check for objective row
+	
+	
 	my @last_row=();
 	push @last_row, ( -($self->{c}) )->value;  # add the negative coefficients of the obj function
 	foreach my $i (1..($self->{m})) { push @last_row, 0 }; # add 0s for the slack variables
-	push @last_row, 1, 0; # add the 1 for the objective value and 0 for the initial valu
+	push @last_row, 1, 0; # add the 1 for the objective value and 0 for the initial value
 	return \@last_row;
 }
 
@@ -358,6 +412,9 @@ sub objective_row {
 	Useage:
 		$MathObjectmatrix = $self->current_tableau
 		$MathObjectmatrix = $self->current_tableau(3,4) #updates basis to (3,4)
+		
+Returns the current constraint matrix, including the constraint constants AND the 
+row containing the objective function coefficients. 
 		
 =cut
 sub current_tableau {
@@ -370,20 +427,20 @@ sub current_tableau {
 	my $c_B  = $self->{obj_row}->extract_columns($self->{basis} );
 	my $c_B2 = Value::Vector->new([ map {$_->value} @$c_B]);
 #	my $current_constraint_matrix = $self->{current_constraint_matrix};
-#	my $B = $self->{B};
+#	my $B = $self->{current_basis_matrix};
 	#main::DEBUG_MESSAGE( "basis: current_constraint_matrix $current_constraint_matrix");
 	#main::DEBUG_MESSAGE( "current_tableau: matrix is $current_constraint_matrix");
 	#main::DEBUG_MESSAGE( "current_basis matrix: $B");
 #	my $correction_coeff = ($c_B2*($self->{current_constraint_matrix}) )->row(1);
 	# subtract the correction coefficients from the obj_row
 	# this essentially extends Gauss reduction applied to the obj_row
-#	my $obj_row_normalized =  abs($self->{B}->det->value)*$self->{obj_row};
+#	my $obj_row_normalized =  abs($self->{current_basis_matrix}->det->value)*$self->{obj_row};
 	#main::DEBUG_MESSAGE(" normalized obj row ",$obj_row_normalized->value);
 	#main::DEBUG_MESSAGE(" correction coeff ", $correction_coeff->value);
 #	my $current_coeff = $obj_row_normalized-$correction_coeff ;
 #	$self->{current_coeff}= $current_coeff; 
 
-	#main::DEBUG_MESSAGE("subtract these two ", (($self->{B}->det) *$self->{obj_row}), " | ", ($c_B*$current_tableau)->dimensions);
+	#main::DEBUG_MESSAGE("subtract these two ", (($self->{current_basis_matrix}->det) *$self->{obj_row}), " | ", ($c_B*$current_tableau)->dimensions);
 	#main::DEBUG_MESSAGE("all coefficients", join('|', $self->{obj_row}->value ) );
 	#main::DEBUG_MESSAGE("current coefficients", join('|', @current_coeff) );
     #main::DEBUG_MESSAGE("type of $self->{basis}", ref($self->{basis}) );
@@ -414,20 +471,20 @@ sub basis {
 	     unless ref($new_basis)=~/ARRAY/;
 	
 	
-	$self->{B} = $self->{M}->submatrix(rows=>[1..($self->{m})],columns=>$self->{basis});
-	my $B = $self->{B};
+	$self->{current_basis_matrix} = $self->{M}->submatrix(rows=>[1..($self->{m})],columns=>$self->{basis});
+	my $B = $self->{current_basis_matrix};
 	#main::DEBUG_MESSAGE("basis: B is $B" );
-	my $Badj = abs($self->{B}->det->value) * ($self->{B}->inverse);
+	my $Badj = abs($self->{current_basis_matrix}->det->value) * ($self->{current_basis_matrix}->inverse);
 	my $M = $self->{M};
 	my ($row_dim, $col_dim) = $M->dimensions;
 	my $current_constraint_matrix = $Badj*$M;
 	my $c_B  = $self->{obj_row}->extract_columns($self->{basis} );
 	my $c_B2 = Value::Vector->new([ map {$_->value} @$c_B]);
 	my $correction_coeff = ($c_B2*($current_constraint_matrix) )->row(1); 
-	my $obj_row_normalized =  abs($self->{B}->det->value)*$self->{obj_row};
+	my $obj_row_normalized =  abs($self->{current_basis_matrix}->det->value)*$self->{obj_row};
 	my $current_coeff = $obj_row_normalized-$correction_coeff ;
 	# updates
-	$self->{B}= $B;
+	$self->{current_basis_matrix}= $B;
 	$self->{data} = $current_constraint_matrix->data;
 	$self->{current_constraint_matrix} = $current_constraint_matrix; 
 	$self->{current_coeff}= $current_coeff; 
@@ -439,11 +496,96 @@ sub basis {
 	return Value::List->new($self->{basis});	
 } 
 
+
+=item find_next_basis 
+
+	($row, $col,$optimum,$unbounded) = $self->find_next_basis (max/min, obj_row_number)
+	
+In phase 2 of the simplex method calculates the next basis.  
+$optimum or $unbounded is set
+if the process has found on the optimum value, or the column 
+$col gives a certificate of unboundedness.
+
+
+=cut 
+
+
+sub find_next_basis {
+	my $self = shift;
+	my $max_or_min = shift;
+	my $obj_row_number = shift;
+	my ( $row_index, $col_index, $optimum, $unbounded)= 
+	     $self->find_next_pivot($max_or_min, $obj_row_number);
+	my $flag;
+	my $basis;
+	if ($optimum or $unbounded) {
+		$basis=$self->basis();
+	} else {
+		$flag = '';
+		$basis =$self->find_next_basis_from_pivot($row_index,$col_index);
+		
+	}
+	return( $basis->value, $optimum,$unbounded );
+	
+}
+
+=item find_next_pivot
+
+	($row, $col,$optimum,$unbounded) = $self->find_next_pivot (max/minm obj_row_number)
+	
+This is used in phase2 so the possible outcomes are only $optimum and $unbounded.
+$infeasible is not possible.  Use the lowest index strategy to find the next pivot
+point. This calls find_pivot_row and find_pivot_column.  $row and $col are undefined if 
+either $optimum or $unbounded is set.
+
+=cut
+
+sub find_next_pivot {
+	my $self = shift;
+	my $max_or_min = shift;
+	my $obj_row_number =shift;
+
+	# sanity check max or min in find pivot column
+	my ($col_index, $value, $row_index, $optimum, $unbounded) = ('','','','');
+	($col_index, $value, $optimum) = $self->find_pivot_column($max_or_min, $obj_row_number);
+#	main::DEBUG_MESSAGE("find_next_pivot: col: $col_index, value: $value opt: $optimum ");
+	return ( $row_index, $col_index, $optimum, $unbounded) if $optimum;
+	($row_index, $value, $unbounded) = $self->find_pivot_row($col_index);
+#	main::DEBUG_MESSAGE("find_next pivot row: $row_index, value: $value unbound: $unbounded");
+	return($row_index, $col_index, $optimum, $unbounded);
+}
+	
+
+
+=item find_next_basis_from_pivot
+
+	List(basis) = $self->find_next_basis (row_index, col_index) 
+
+Calculate the next basis from the current basis given the pivot  position.
+
+=cut  
+
+sub find_next_basis_from_pivot {
+	my $self = shift;
+	my $row_index = shift;
+	my $col_index =shift;
+	# sanity check max or min in find pivot column
+ 	my $basis = main::Set($self->{basis});	
+ 	my ($leaving_col_index, $value) = $self->find_leaving_column($row_index);
+ 	$basis = main::Set( $basis - main::Set($leaving_col_index) + main::Set($col_index));
+ 	# main::DEBUG_MESSAGE( "basis is $basis, leaving index $leaving_col_index
+ 	#    entering index is $col_index");
+ 	#$basis = [$basis->value, main::Real($col_index)];
+ 	return ($basis);
+} 
+
+
+
 =item find_pivot_column
 
-	($index, $value, $optimum) = $self->find_pivot_column (max/min, row_number)
+	($index, $value, $optimum) = $self->find_pivot_column (max/min, obj_row_number)
 	
-This find the left most obj function coefficient that is negative (for maximizing)
+This finds the left most obj function coefficient that is negative (for maximizing)
 or positive (for minimizing) and returns the value and the index.  Only the 
 index is really needed for this method.  The row number is included because there might
 be more than one objective function in the table (for example when using
@@ -541,7 +683,7 @@ sub find_pivot_row {
 
 =item find_leaving_column
 
-	($index, $value) = $self->find_leaving_column(row_number)
+	($index, $value) = $self->find_leaving_column(obj_row_number)
 
 Finds the non-basis column with a non-zero entry in the given row. When
 called with the pivot row number this index gives the column which will 
@@ -574,6 +716,7 @@ sub find_leaving_column {
 	}
 	return( $index, $value);
 }
+
 =item find_short_cut_row
 
 	($index, $value, $feasible)=$self->find_short_cut_row
@@ -606,6 +749,7 @@ sub find_short_cut_row {
 	}
 	return ( $index, $value, $feasible);
 }
+
 =item find_short_cut_column
 
 	($index, $value, $infeasible) = $self->find_short_cut_column(row number)
@@ -644,85 +788,21 @@ sub find_short_cut_column {
 =item find_next_short_cut_pivot 
 
 	($row, $col, $feasible, $infeasible) = $self->find_next_short_cut_pivot
+	
+	
+Following the short-cut algorithm this chooses the next pivot by choosing the row
+with the most negative constraint constant entry (top most first in case of tie) and 
+then the left most negative entry in that row. 
+
+The process stops with either $feasible=1 (state variables give a feasible point for the 
+constraints) or $infeasible=1 (a row in the tableau shows that the LOP has empty domain.)
+	
 =cut
 
+=item find_next_short_cut_basis
 
-=item find_next_basis 
-
-	($row, $col,$optimum,$unbounded) = $self->find_next_basis (max/minm row_num)
 
 =cut 
-
-
-sub find_next_basis {
-	my $self = shift;
-	my $max_or_min = shift;
-	my $row_num = shift;
-	my ( $row_index, $col_index, $optimum, $unbounded)= 
-	     $self->find_next_pivot($max_or_min, $row_num);
-	my $flag;
-	my $basis;
-	if ($optimum or $unbounded) {
-		$basis=$self->basis();
-	} else {
-		$flag = '';
-		$basis =$self->find_next_basis_from_pivot($row_index,$col_index);
-		
-	}
-	return( $basis->value, $optimum,$unbounded );
-	
-}
-
-=item find_next_pivot
-
-	($row, $col,$optimum,$unbounded) = $self->find_next_pivot (max/minm row_num)
-	
-This is used in phase2 so the possible outcomes are only $optimum and $unbounded.
-$infeasible is not possible.  Use the lowest index strategy to find the next pivot
-point. This calls find_pivot_row and find_pivot_column.  $row and $col are undefined if 
-either $optimum or $unbounded is set.
-
-=cut
-
-sub find_next_pivot {
-	my $self = shift;
-	my $max_or_min = shift;
-	my $row_num =shift;
-
-	# sanity check max or min in find pivot column
-	my ($col_index, $value, $row_index, $optimum, $unbounded) = ('','','','');
-	($col_index, $value, $optimum) = $self->find_pivot_column($max_or_min, $row_num);
-#	main::DEBUG_MESSAGE("find_next_pivot: col: $col_index, value: $value opt: $optimum ");
-	return ( $row_index, $col_index, $optimum, $unbounded) if $optimum;
-	($row_index, $value, $unbounded) = $self->find_pivot_row($col_index);
-#	main::DEBUG_MESSAGE("find_next pivot row: $row_index, value: $value unbound: $unbounded");
-	return($row_index, $col_index, $optimum, $unbounded);
-}
-	
-
-
-=item find_next_basis_from_pivot
-
-	List(basis) = $self->find_next_basis (row_index, col_index) 
-
-Calculate the next basis from the current basis given the pivot  position.
-
-=cut  
-
-sub find_next_basis_from_pivot {
-	my $self = shift;
-	my $row_index = shift;
-	my $col_index =shift;
-	# sanity check max or min in find pivot column
- 	my $basis = main::Set($self->{basis});	
- 	my ($leaving_col_index, $value) = $self->find_leaving_column($row_index);
- 	$basis = main::Set( $basis - main::Set($leaving_col_index) + main::Set($col_index));
- 	# main::DEBUG_MESSAGE( "basis is $basis, leaving index $leaving_col_index
- 	#    entering index is $col_index");
- 	#$basis = [$basis->value, main::Real($col_index)];
- 	return ($basis);
-} 
-
 
 # eventually these routines should be included in the Value::Matrix 
 # module?

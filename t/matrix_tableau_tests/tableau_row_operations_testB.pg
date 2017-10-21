@@ -303,9 +303,11 @@ $HR
 next pivot  :  \(\{List($tableau1->find_next_pivot('max')) \}\)$PAR
 next basis = \(\{List($tableau1->find_next_basis('max')) \}\)$PAR
 tableau: $PAR
-\[\{$tableau1->current_tableau(
-	[$tableau1->find_next_basis('max')]->[0],
-	[$tableau1->find_next_basis('max')]->[1]
+\[\{lp_display_mm( 
+	$tableau1->current_tableau(
+		[$tableau1->find_next_basis('max')]->[0],
+		[$tableau1->find_next_basis('max')]->[1]
+	)
 )\}\]
 
 END_TEXT

@@ -49,11 +49,11 @@ $c_B2 = Value::Vector->new(map {$_->value} @$c_B);
 $c_4 = $t->current_tableau;
 
 
-my $Badj = ($t->{B}->det) * ($t->{B}->inverse);
+my $Badj = ($t->{current_basis_matrix}->det) * ($t->{current_basis_matrix}->inverse);
 my $current_tableau = $Badj * $t->{M};  # the A | S | obj | b
 
 $correction_coeff = ($c_B2*$current_tableau)->row(1);
-$obj_row_normalized = ($t->{B}->det) *$t->{obj_row};
+$obj_row_normalized = ($t->{current_basis_matrix}->det) *$t->{obj_row};
 $current_coeff = $obj_row_normalized-$correction_coeff ;
 
 TEXT("obj_row ", $t->{obj_row}, $BR );
@@ -71,7 +71,7 @@ original tableau is [`[$t->{M}]`]
 
 and basis is [$t->basis]
 
-B is [`[$t->{B}]`] with determinant [$t->{B}->det]
+B is [`[$t->{current_basis_matrix}]`] with determinant [$t->{current_basis_matrix}->det]
 
 the objective row is [@ $t->{obj_row} @]
 
