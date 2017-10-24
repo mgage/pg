@@ -558,12 +558,15 @@ sub basis {
 
 =item find_next_basis 
 
-	($row, $col,$optimum,$unbounded) = $self->find_next_basis (max/min, obj_row_number)
+	($basis->value,$flag) = $self->find_next_basis (max/min, obj_row_number)
 	
 In phase 2 of the simplex method calculates the next basis.  
 $optimum or $unbounded is set
 if the process has found on the optimum value, or the column 
 $col gives a certificate of unboundedness.
+
+$flag can be either 'optimum' or 'unbounded' in which case the basis returned is the current basis. 
+$basis->value is an ARRAY of column numbers. 
 
 
 =cut 
@@ -575,17 +578,20 @@ sub find_next_basis {
 	my $obj_row_number = shift;
 	my ( $row_index, $col_index, $optimum, $unbounded)= 
 	     $self->find_next_pivot($max_or_min, $obj_row_number);
-	my $flag;
+	my $flag = undef;
 	my $basis;
 	if ($optimum or $unbounded) {
 		$basis=$self->basis();
+		if ($optimum) {
+			$flag = 'optimum'
+		} elsif ($unbounded) {
+			$flag = 'unbounded'}
 	} else {
-		$flag = '';
-		$basis =$self->find_next_basis_from_pivot($row_index,$col_index);
-		
+		Value::Error("At least part of the pivot index (row,col) is not defined") unless
+		   defined($row_index) and defined($col_index); 
+		$basis =$self->find_next_basis_from_pivot($row_index,$col_index);		
 	}
-	return( $basis->value, $optimum,$unbounded );
-	
+	return( $basis->value, $flag );	
 }
 
 =item find_next_pivot
@@ -619,7 +625,7 @@ sub find_next_pivot {
 
 =item find_next_basis_from_pivot
 
-	List(basis) = $self->find_next_basis (pivot_row, pivot_column) 
+	List(basis) = $self->find_next_basis_from_pivot (pivot_row, pivot_column) 
 
 Calculate the next basis from the current basis 
 given the pivot  position.
@@ -822,9 +828,18 @@ sub find_next_short_cut_pivot {
 
 =item find_next_short_cut_basis
 
+	($basis->value, $flag) = $self->find_next_short_cut_basis()
+	
+In phase 1 of the simplex method calculates the next basis for the short cut method.  
+$flag is set to 'feasible_point' if the basis and its corresponding tableau is associated with a basic feasible point
+(a point on a corner of the domain of the LOP). The tableau is ready for phase 2 processing.
+$flag is set to 'infeasible_lop' which means that the tableau has
+a row which demonstrates that the LOP constraints are inconsistent and the domain is empty.  
+In these cases the basis returned is the current basis of the tableau object.  
 
-FIXME -- this needs to be written	?  
-just find_next_basis_from_pivot  should work?
+Otherwise the $basis->value returned is the next basis that should be used in the short_cut method
+and $flag contains undef.
+
 
 =cut 
 
@@ -835,12 +850,20 @@ sub find_next_short_cut_basis {
 	my ( $row_index, $col_index, $feasible_point, $infeasible_lop)= 
 	     $self->find_next_short_cut_pivot();
 	my $basis;
+	$flag = undef;
 	if ($feasible_point or $infeasible_lop) {
 		$basis=$self->basis();
+		if ($feasible_point) {
+			$flag = 'feasible_point';
+		} elsif ($infeasible_lop){
+			$flag = 'infeasible_lop';
+		}
 	} else {
+		Value::Error("At least part of the pivot index (row,col) is not defined") unless
+		   defined($row_index) and defined($col_index); 
 		$basis =$self->find_next_basis_from_pivot($row_index,$col_index);		
 	}
-	return( $basis->value, $feasible_point,$infeasible_lop );
+	return( $basis->value, $flag );
 	
 }
 
