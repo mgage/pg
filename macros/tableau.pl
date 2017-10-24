@@ -28,7 +28,7 @@
  #      uniquely from the parameter variables.  
  #      The non-basis (parameter) variables are set to zero. 
  #
- #  state variables (assuming parameter variables are zero or when given parameter variables)
+ # state variables (assuming parameter variables are zero or when given parameter variables)
  # create the methods for updating the various containers
  # create the method for printing the tableau with all its decorations 
  # possibly with switches to turn the decorations on and off. 
@@ -104,6 +104,26 @@ Used most often when $constraints is a LinearInequality math object.
 
 =cut 
 
+=item lop_display
+	
+	Useage: 
+	
+	lop_display($tableau, align=>'cccc|cc|c|c', toplevel=>[qw(x1,x2,x3,x4,s1,s2,P,b)])
+ 	
+Pretty prints the output of a matrix as a LOP with separating labels and 
+variable labels.
+
+=cut
+
+=head3 References:
+
+MathObject Matrix methods: L<http://webwork.maa.org/wiki/Matrix_(MathObject_Class)>
+MathObject Contexts: L<http://webwork.maa.org/wiki/Common_Contexts>
+CPAN RealMatrix docs: L<http://search.cpan.org/~leto/Math-MatrixReal-2.09/lib/Math/MatrixReal.pm>
+
+More references: L<lib/Matrix.pm>
+
+=cut
 
 =head2 Package tableau
 
@@ -134,7 +154,8 @@ Used most often when $constraints is a LinearInequality math object.
  #	current_basis_matrix              # (should be new name for B above
  #                                    # a square invertible matrix corresponding to the 
  #	                                  # current basis columns)
-	# flag indicating the column (1 or n+m+1) for the objective value
+ 
+ # flag indicating the column (1 or n+m+1) for the objective value
 	constraint_labels => undef,   (not sure if this remains relevant after pivots)
 	problem_var_labels => undef, 
 	slack_var_labels => undef,
@@ -142,106 +163,6 @@ Used most often when $constraints is a LinearInequality math object.
 
 =cut
 
-=item current_tableau
-
-		$self->current_tableau
-		Parameters: ()
-		Returns:  A MathObjectMatrix
-		
-This represents the current version of the tableau
-
-=cut
-
-=item  objective_row
-
-		$self->objective_row
-		Parameters: ()
-		Returns: 
-
-=cut
-
-=item  basis_columns
-
-	ARRAY reference = $self->basis_columns()
-	[3,4]           = $self->basis_columns([3,4])
-	
-	Sets or returns the basis_columns as an ARRAY reference
-	
-=cut 
-
-=item   basis 
-
-		$self->basis
-		Parameter: ARRAY or ARRAY_ref or ()
-		Returns: MathObject_list
-		
-		FiXME -- this should accept a MathObject_List (or MO_Set?)
-
-=cut
-		
-=head3 Package Tableau (eventually package Matrix?)
-
-=item  row_slice
-
-		$self->row_slice
-
-		Parameter: @slice or \@slice 
-		Return: MathObject matrix
-		
-=cut
-
-=item  extract_rows
-
-		$self->extract_rows
-
-		Parameter: @slice or \@slice 
-		Return: two dimensional array ref 
-		
-=item  extract_rows_to_list
-
-		Parameter: @slice or \@slice 
-		Return: MathObject List of row references
-
-=item   extract_columns
-
-		$self->extract_columns
-
-		Parameter: @slice or \@slice 
-		Return: two dimensional array ref 
-
-=item  column_slice
-
-		$self->column_slice
-
-		Parameter: @slice or \@slice 
-		Return: MathObject Matrix
-
-=item  extract_columns_to_list
-
-		$self->extract_columns_to_list
-
-		Parameter: @slice or \@slice 
-		Return: MathObject List of Matrix references ?
-
-=item submatrix
-
-		$self->submatrix
-
-		Parameter:(rows=>\@row_slice,columns=>\@column_slice)
-		Return: MathObject matrix
-		
-=cut 
-
-
-=head3 References:
-
-MathObject Matrix methods: L<http://webwork.maa.org/wiki/Matrix_(MathObject_Class)>
-MathObject Contexts: L<http://webwork.maa.org/wiki/Common_Contexts>
-CPAN RealMatrix docs: L<http://search.cpan.org/~leto/Math-MatrixReal-2.09/lib/Math/MatrixReal.pm>
-
-More references: L<lib/Matrix.pm>
-
-=cut
 
 
 sub _tableau_init {};   # don't reload this file
@@ -249,16 +170,11 @@ sub _tableau_init {};   # don't reload this file
 # loadMacros("tableau_main_subroutines.pl");
 
 
-=head4 Subroutines added to the main:: Package
 
 
-=cut
+#	ANS( $tableau->cmp(checker=>tableauEquivalence()) ); 
 
-=item tableauEquivalence
 
-	$tableau->cmp(checker=>tableauEquivalence())
-
-=cut
 
 sub tableauEquivalence {
 	return sub {
@@ -281,16 +197,10 @@ sub tableauEquivalence {
 	}
  }
 
-=item linebreak_at_commas
 	
-	Useage: 
-	
-	$foochecker =  $constraints->cmp()->withPostFilter(
- 		linebreak_at_commas()
- 	);
-
-=cut
-
+#	$foochecker =  $constraints->cmp()->withPostFilter(
+# 		linebreak_at_commas()
+# 	);
 
 sub linebreak_at_commas {
 	return sub {
@@ -307,16 +217,10 @@ sub linebreak_at_commas {
 	};
 }
 
-=item linebreak_at_commas
 	
-	Useage: 
-	
-	lop_display($tableau, align=>'cccc|cc|c|c', toplevel=>[qw(x1,x2,x3,x4,s1,s2,P,b)])
- 	
-Pretty prints the output of a matrix as a LOP with separating labels and 
-variable labels.
-
-=cut
+# lop_display($tableau, align=>'cccc|cc|c|c', toplevel=>[qw(x1,x2,x3,x4,s1,s2,P,b)]) 	
+# 	Pretty prints the output of a matrix as a LOP with separating labels and 
+# 	variable labels.
 
 sub lop_display {
 	my $tableau = shift;
@@ -353,6 +257,8 @@ sub class {"Matrix"};
 sub _Matrix {    # can we just import this?
 	Value::Matrix->new(@_);
 }
+
+# tableau constructor   Tableau->new(A=>Matrix, b=>Vector or Matrix, c=>Vector or Matrix)
 
 sub new {
 	my $self = shift; my $class = ref($self) || $self;
@@ -443,6 +349,28 @@ sub assemble_matrix {
 	                # is not in this part of the matrix
 }
 
+=head2 Accessors and mutators
+
+=item  basis_columns
+
+	ARRAY reference = $self->basis_columns()
+	[3,4]           = $self->basis_columns([3,4])
+	
+	Sets or returns the basis_columns as an ARRAY reference
+	
+=cut 
+
+
+=item  objective_row
+
+		$self->objective_row
+		Parameters: ()
+		Returns: 
+
+=cut
+
+
+
 sub objective_row {
 	my $self = shift;
 	# sanity check for objective row
@@ -457,6 +385,10 @@ sub objective_row {
 
 =item current_tableau
 
+		$self->current_tableau
+		Parameters: () or (list)
+		Returns:  A MathObjectMatrix
+
 	Useage:
 		$MathObjectmatrix = $self->current_tableau
 		$MathObjectmatrix = $self->current_tableau(3,4) #updates basis to (3,4)
@@ -465,6 +397,11 @@ Returns the current constraint matrix as a MathObjectMatrix,
 including the constraint constants,
 problem variable coefficients, slack variable coefficients  AND the 
 row containing the objective function coefficients. 
+    -------------
+	|A | S |0| b| 
+	-------------
+	|  c   |z|z*|
+	-------------
 
 If a list of basis columns is passed as an argument then $self->basis()
 is called to switch the tableau to the new basis before returning
@@ -485,16 +422,17 @@ sub current_tableau {
 
 =item basis
 
-	ListObjectList = $self->basis
-	ListObjectList = $self->basis(3,4)
-	ListObjectList = $self->basis([3,4])
-	ListObjectList = $self->basis(Set(3,4))
+	MathObjectList = $self->basis
+	MathObjectList = $self->basis(3,4)
+	MathObjectList = $self->basis([3,4])
+	MathObjectList = $self->basis(Set(3,4))
+	MathObjectList = $self->basis(List(3,4))
 	
 	to obtain ARRAY reference use
 	[3,4]== $self->basis(Set3,4)->value
 
 Returns a MathObjectList containing the current basis columns.  If basis columns
-are provided as arguments it resets all elements of the tableau to present
+are provided as arguments it updates all elements of the tableau to present
 the view corresponding to the new choice of basis columns. 
 
 =cut
@@ -938,143 +876,16 @@ sub find_short_cut_column {
 
 
 
-=item tableau_pivot
-
-	Tableau = $self->tableau_pivot(3,4)
-	MathObjectMatrix = $self->tableau_pivot(3,4)->current_tableau
-
-FIXME -- this needs to be written	
-
-Pivot the tableau to a new basis at the given pivot point.
-Maintain integer status if the original contains integers.
-
-Returns tableau object?
-
-=cut
-
-# eventually these routines should be included in the Value::Matrix 
-# module?
-
-=pod 
-
-These are generic matrix routines.  Perhaps some or all of these should
-be added to the file Value::Matrix?
-
-=cut
-
-package Value::Matrix;
-
-sub _Matrix {
-	Value::Matrix->new(@_);
-}
-
-=item row_slice
-
-	MathObjectMatrix = $self->row_slice(3,4)
-	MathObjectMatrix = $self->row_slice([3,4])
-
-Similar to $self->extract_rows   (or $self->rows) but returns a MathObjectmatrix
-
-=cut
-
-sub row_slice {
-	my $self = shift;
-	@slice = @_;
-	return _Matrix( $self->extract_rows(@slice) );
-}
-
-=item extract_rows
-
-	ARRAY reference = $self->extract_rows(@slice)
-	ARRAY reference = $self->extract_rows([@slice])
-
-=cut
-
-sub extract_rows {
-	my $self = shift;
-	my @slice = @_;
-	if (ref($slice[0]) =~ /ARRAY/) { # handle array reference
-		@slice = @{$slice[0]};
-	} elsif (@slice == 0) { # export all rows to List
-		@slice = ( 1..(($self->dimensions)[0]) );	
-	}
-	return [map {$self->row($_)} @slice ]; #prefer to pass references when possible
-}
-sub column_slice {
-	my $self = shift;
-	return _Matrix( $self->extract_columns(@_) )->transpose;  # matrix is built as rows then transposed.
-}
-
-=item extract_columns
-
-	ARRAY reference = $self->extract_columns(@slice)
-	ARRAY reference = $self->extract_columns([@slice])
-
-=cut
-
-sub extract_columns { 
-	my $self = shift;
-	my @slice = @_;
-	if (ref($slice[0]) =~ /ARRAY/) { # handle array reference
-		@slice = @{$slice[0]};
-	} elsif (@slice == 0) { # export all columns to an array
-		@slice = ( 1..(($self->dimensions)[1] ) );	
-	}
-    return  [map { $self->transpose->row($_) } @slice] ; 
-    # returns the columns as an array of 1 by n row matrices containing values
-    # if you pull columns directly you get an array of 1 by n  column vectors.
-    # prefer to pass references when possible
-}
-
-=item extract_rows_to_list
-
-	MathObjectList = $self->extract_rows_to_list(@slice)
-	MathObjectList = $self->extract_rows_to_list([@slice])
-
-=cut
-
-sub extract_rows_to_list {
-	my $self = shift;
-	Value::List->new($self->extract_rows(@_));
-}
-
-=item extract_columns_to_list
-
-	ARRAY reference = $self->extract_columns_to_list(@slice)
-	ARRAY reference = $self->extract_columns_to_list([@slice])
-
-=cut
-
-sub extract_columns_to_list {
-	my $self = shift;
-	Value::List->new($self->extract_columns(@_) );
-}
-
-=item submatrix
-
-	MathObjectMatrix = $self->submatrix([[1,2,3],[2,4,5]])
-	
-Extracts a submatrix from a Matrix and returns it as MathObjectMatrix.
-
-Indices for MathObjectMatrices start at 1. 
-
-=cut
-
-sub submatrix {
-	my $self = shift;
-	my %options = @_;
-	my($m,$n) = $self->dimensions;
-	my $row_slice = ($options{rows})?$options{rows}:[1..$m];
-	my $col_slice = ($options{columns})?$options{columns}:[1..$n];
-	return $self->row_slice($row_slice)->column_slice($col_slice);
-}
-
 =item row_reduce
 
-	$self->row_reduce(3,4)
+(or tableau pivot???)
+
+	Tableau = $self->row_reduce(3,4)
+	MathObjectMatrix = $self->row_reduce(3,4)->current_tableau
+
 	
 Row reduce matrix so that column 4 is a basis column. Used in 
-pivoting for simplex method
+pivoting for simplex method. Returns tableau object.
 
 =cut
 sub row_reduce {
@@ -1129,13 +940,178 @@ sub row_reduce {
 		
 	}
 	$self->{basis_coeff} = $pivot_value;
+	return $self;
 }
+# eventually these routines should be included in the Value::Matrix 
+# module?
+
+=pod 
+
+These are generic matrix routines.  Perhaps some or all of these should
+be added to the file Value::Matrix?
+
+=cut
+
+package Value::Matrix;
+
+sub _Matrix {
+	Value::Matrix->new(@_);
+}
+
+=item row_slice
+
+	$self->row_slice
+
+	Parameter: @slice or \@slice 
+	Return: MathObject matrix
+		
+	MathObjectMatrix = $self->row_slice(3,4)
+	MathObjectMatrix = $self->row_slice([3,4])
+
+Similar to $self->extract_rows   (or $self->rows) but returns a MathObjectmatrix
+
+=cut
+
+sub row_slice {
+	my $self = shift;
+	@slice = @_;
+	return _Matrix( $self->extract_rows(@slice) );
+}
+
+=item extract_rows
+
+	$self->extract_rows
+
+	Parameter: @slice or \@slice 
+	Return: two dimensional array ref 
+
+	ARRAY reference = $self->extract_rows(@slice)
+	ARRAY reference = $self->extract_rows([@slice])
+
+=cut
+
+sub extract_rows {
+	my $self = shift;
+	my @slice = @_;
+	if (ref($slice[0]) =~ /ARRAY/) { # handle array reference
+		@slice = @{$slice[0]};
+	} elsif (@slice == 0) { # export all rows to List
+		@slice = ( 1..(($self->dimensions)[0]) );	
+	}
+	return [map {$self->row($_)} @slice ]; #prefer to pass references when possible
+}
+
+=item column_slice
+
+	$self->column_slice()
+
+	Parameter: @slice or \@slice 
+	Return: two dimensional array ref 
+
+	ARRAY reference = $self->extract_rows(@slice)
+	ARRAY reference = $self->extract_rows([@slice])
+
+=cut
+
+sub column_slice {
+	my $self = shift;
+	return _Matrix( $self->extract_columns(@_) )->transpose;  # matrix is built as rows then transposed.
+}
+
+=item extract_columns
+
+	$self->extract_columns
+
+	Parameter: @slice or \@slice 
+	Return: two dimensional array ref 
+
+	ARRAY reference = $self->extract_columns(@slice)
+	ARRAY reference = $self->extract_columns([@slice])
+
+=cut
+
+sub extract_columns { 
+	my $self = shift;
+	my @slice = @_;
+	if (ref($slice[0]) =~ /ARRAY/) { # handle array reference
+		@slice = @{$slice[0]};
+	} elsif (@slice == 0) { # export all columns to an array
+		@slice = ( 1..(($self->dimensions)[1] ) );	
+	}
+    return  [map { $self->transpose->row($_) } @slice] ; 
+    # returns the columns as an array of 1 by n row matrices containing values
+    # if you pull columns directly you get an array of 1 by n  column vectors.
+    # prefer to pass references when possible
+}
+
+=item extract_rows_to_list
+
+	Parameter: @slice or \@slice 
+	Return: MathObject List of row references
+
+	MathObjectList = $self->extract_rows_to_list(@slice)
+	MathObjectList = $self->extract_rows_to_list([@slice])
+
+=cut
+
+sub extract_rows_to_list {
+	my $self = shift;
+	Value::List->new($self->extract_rows(@_));
+}
+
+=item extract_columns_to_list
+
+	$self->extract_columns_to_list
+
+	Parameter: @slice or \@slice 
+	Return: MathObject List of Matrix references ?
+
+	ARRAY reference = $self->extract_columns_to_list(@slice)
+	ARRAY reference = $self->extract_columns_to_list([@slice])
+
+=cut
+
+sub extract_columns_to_list {
+	my $self = shift;
+	Value::List->new($self->extract_columns(@_) );
+}
+
+=item submatrix
+
+	$self->submatrix
+
+	Parameter:(rows=>\@row_slice,columns=>\@column_slice)
+	Return: MathObject matrix
+
+	MathObjectMatrix = $self->submatrix([[1,2,3],[2,4,5]])
+	
+Extracts a submatrix from a Matrix and returns it as MathObjectMatrix.
+
+Indices for MathObjectMatrices start at 1. 
+
+=cut
+
+sub submatrix {
+	my $self = shift;
+	my %options = @_;
+	my($m,$n) = $self->dimensions;
+	my $row_slice = ($options{rows})?$options{rows}:[1..$m];
+	my $col_slice = ($options{columns})?$options{columns}:[1..$n];
+	return $self->row_slice($row_slice)->column_slice($col_slice);
+}
+
+
 
 =item change_matrix_entry
 
+	$Matrix->change_matrix_entry([i,j,k],$value)
 
-
+	Taken from MatrixReduce.pl.  Written by Davide Cervone.
+	
+	perhaps "assign" would be a better name for this?
+	
 =cut
+
 #  This was written by Davide Cervone.
 #  http://webwork.maa.org/moodle/mod/forum/discuss.php?d=2970
 # taken from MatrixReduce.pl from Paul Pearson

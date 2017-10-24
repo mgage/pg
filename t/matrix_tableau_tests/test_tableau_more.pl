@@ -9,12 +9,18 @@ use Test::Exception;
 use Parser;
 use Value;
 use Class::Accessor;
-#use PGcore;
+use PGcore;
 
+#require "PG.pl";
+#require "PGbasicmacros.pl";
+#require "PGauxiliaryFunctions.pl";
 require "tableau.pl";
 require "Value.pl"; #gives us Real() etc. 
 #require "Parser.pl"; #gives us Context() but also uses loadMacros();
 require "niceTables.pl";
+
+ok(max(3,4)==4, "check max function");
+
 
 sub Context {Parser::Context->current(\%context,@_)}
 unless (%context && $context{current}) {
@@ -77,6 +83,11 @@ $tableau1 = Tableau->new(A=>$A, b=>$b,  c=>$c);
 ok (1==1, "trivial first test");
 ok (defined($tableau1), 'tableau has been defined and loaded');
 is (ref($tableau1), "Tableau", 'has type Tableau' );
+
+print "stringify tableau: ", $tableau1, "\n";
+
+print lop_display($tableau1);
+
 is ($tableau1->{m}, 2,  'number of constraints is 2');
 is ($tableau1->{n}, 4,  'number of variables is 4');
 is_deeply ( [$tableau1->{m},$tableau1->{n}], [$tableau1->{A}->dimensions], '{m},{n} match dimensions of A');
