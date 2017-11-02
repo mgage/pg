@@ -9,6 +9,19 @@ sub isMatrix {
 sub matrix_column_slice{
 	matrix_from_matrix_cols(@_);
 }
+
+sub lp_basis_pivot {
+	my ($old_tableau,$old_basis,$pivot) = @_;  # $pivot is a Value::Point
+	my $new_tableau= lp_clone($old_tableau);
+	main::lp_pivot($new_tableau, $pivot->extract(1)-1,$pivot->extract(2)-1);	
+	my $new_matrix = Matrix($new_tableau);
+	my ($n,$m) = $new_matrix->dimensions;
+	my $param_size = $m-$n -1;	#n=constraints+1, #m = $param_size + $constraints +2
+	my $new_basis = ( $old_basis - ($pivot->extract(1)+$param_size) + ($pivot->extract(2)) )->sort;
+	my @statevars = get_tableau_variable_values($new_matrix, $new_basis);
+	return ( $new_tableau, Set($new_basis),\@statevars); #FIXME -- force to set (from type Union) to insure that ->data is an array and not a string.
+}
+
 sub matrix_from_matrix_cols {
 	my $M = shift;   # a MathObject matrix_columns
 	my($n,$m) = $M->dimensions;

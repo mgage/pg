@@ -13,6 +13,7 @@ loadMacros(
 "quickMatrixEntry.pl",
 #"scaffold.pl",
 "tableau.pl",
+"tableau_main_subroutines.pl", # deprecated routines
 #"gage_matrix_ops.pl",
 "PGinfo.pl",
 "source.pl",
