@@ -45,11 +45,11 @@ The structure of the tableau is:
 	----------------------------------------------
 	Matrix A, the constraint matrix is n=num_problem_vars by m=num_slack_vars
 	Matrix S, the slack variables is m by m
-	Matrix b, the constraint constants is n by 1
-	Matrix c, the objective function coefficients matrix is 1 by n or 2 by n
+	Matrix b, the constraint constants is n by 1 (Matrix or ColumnVector)
+	Matrix c, the objective function coefficients matrix is 1 by n
 	The next to the last column holds z or objective value
 	z(...x^i...) = c_i* x^i  (Einstein summation convention)
-	FIXME:  allow c to be a 2 by n matrix so that you can do phase1 calculations easily 
+	FIXME: ?? allow c to be a 2 by n matrix so that you can do phase1 calculations easily 
 
 
 =cut
@@ -134,47 +134,47 @@ More references: L<lib/Matrix.pm>
   Tableau->new(A=>Matrix, b=>Vector or Matrix, c=>Vector or Matrix)
 
 	A => undef, # original constraint matrix  MathObjectMatrix
-	b => undef, # constraint constants Vector or MathObjectMatrix 1 by n
+	b => undef, # constraint constants ColumnVector or MathObjectMatrix 1 by n
 	c => undef, # coefficients for objective function Vector or MathObjectMatrix 1 by n
 	obj_row => undef, # contains the negative of the coefficients of the objective function.
 	z => undef, # value for objective function
 	n => undef, # dimension of problem variables (columns in A)
 	m => undef, # dimension of slack variables (rows in A)
 	S => undef, # square m by m matrix for slack variables
-	M => undef,  # matrix of consisting of all original columns and all 
-		rows except for the objective function row 
-	obj_col_num => undef,
-	basis => undef, # list describing the current basis columns corresponding 
+	M => undef,  # matrix (m by m+n+1+1) consisting of all original columns and all 
+		rows except for the objective function row. The m+n+1 column and 
+		is the objective_value column. It is all zero with a pivot in the objective row. 
+		
+	obj_col_num => undef,  # have obj_col on the left or on the right?
+	basis => List, # list describing the current basis columns corresponding 
 		to determined variables.
 	current_basis_matrix => undef,  # square invertible matrix 
 		corresponding to the current basis columns
  
-	current_constraint_matrix=>undef, # the current version of [A | S]
-	current_b,                        # the current version of the constraint constants b
- #	current_basis_matrix              # (should be new name for B above
- #                                    # a square invertible matrix corresponding to the 
- #	                                  # current basis columns)
+	current_constraint_matrix=>(m by n matrix),  # the current version of [A | S]
+	current_b=> (1 by m matrix or Column vector) # the current version of the constraint constants b
+ 	current_basis_matrix  => (m by m invertible matrix) a square invertible matrix 
+ 	     # corresponding to the current basis columns
  
  # flag indicating the column (1 or n+m+1) for the objective value
 	constraint_labels => undef,   (not sure if this remains relevant after pivots)
 	problem_var_labels => undef, 
 	slack_var_labels => undef,
 	
-
+	Notes:  (1 by m MathObjectMatrix) <= Value::Matrix->new($self->b->transpose->value )
 =cut
 
-
-
-sub _tableau_init {};   # don't reload this file
-
-# loadMacros("tableau_main_subroutines.pl");
 
 
 
 
 #	ANS( $tableau->cmp(checker=>tableauEquivalence()) ); 
 
+package main;
 
+sub _tableau_init {};   # don't reload this file
+
+# loadMacros("tableau_main_subroutines.pl");
 
 sub tableauEquivalence {
 	return sub {
@@ -202,6 +202,7 @@ sub tableauEquivalence {
 # 		linebreak_at_commas()
 # 	);
 
+package main;
 sub linebreak_at_commas {
 	return sub {
 		my $ans=shift;
@@ -238,6 +239,47 @@ sub lop_display {
 	DataTable([[@toplevel],@matrix],align=>$options{alignment}); 
 }
 
+sub get_tableau_variable_values {
+   my $mat = shift;  # a MathObject matrix
+   my $basis =shift; # a MathObject set
+   # FIXME
+   # type check ref($mat)='Matrix'; ref($basis)='Set';
+   # or check that $mat has dimensions, element methods; and $basis has a contains method
+   my ($n, $m) = $mat->dimensions;
+   @var = ();
+   #DEBUG_MESSAGE( "start new matrix");
+   foreach my $j (1..$m-2) {    # the last two columns of the tableau are object variable and constants
+      if (not $basis->contains($j)) {
+            #DEBUG_MESSAGE( "j= $j not in basis");
+            $var[$j-1]=0; next; # non-basis variables (parameters) are set to 0. 
+            
+      } else {
+            foreach my $i (1..$n-1) {  # the last row is the objective function
+               # if this is a basis column there should be only one non-zero element(the pivot)
+               if ( not $mat->element($i,$j) == 0 ) { # should this have ->value?????
+                  $var[$j-1] = ($mat->element($i,$m)/$mat->element($i,$j))->value;                  
+                  #DEBUG_MESSAGE("i=$i j=$j var = $var[$j-1] ");
+                  next;
+               }
+             
+            }
+      }
+  }                    # element($n, $m-1) is the coefficient of the objective value. 
+                       # this last variable is the value of the objective function
+  push @var , ($mat->element($n,$m)/$mat->element($n,$m-1))->value;
+
+     @var;
+}
+#### Test -- assume matrix is this 
+#    	1	2	1	0	0 |	0 |	3
+#		4	5	0	1	0 |	0 |	6
+#		7	8	0	0	1 |	0 |	9
+#		-1	-2	0	0	0 |	1 |	10  # objective row
+# and basis is {3,4,5}  (start columns with 1)
+#  $n= 4;  $m = 7
+#  $x1=0; $x2=0; $x3=s1=3; $x4=s2=6; $x5=s3=9; w=10=objective value
+# 
+#
 
 ##################################################
 package Tableau;
@@ -298,7 +340,9 @@ sub initialize {
 	        ref($self->{b}) =~ /Value::Vector|Value::Matrix/ && 
 	        ref($self->{c}) =~ /Value::Vector|Value::Matrix/){
 		Value::Error ("Error: Required inputs for creating tableau:\n". 
-		"Tableau(A=> Matrix, b=>ColumnVector or Matrix, c=>Vector or Matrix)");
+		"Tableau(A=> Matrix, b=>ColumnVector or Matrix, c=>Vector or Matrix)".
+		"not the arguments of type ". ref($self->{A}). " |".ref($self->{b})."|  |".ref($self->{c}).
+		"|");
 	}
 	my ($m, $n)=($self->{A}->dimensions);
 	$self->n(  ($self->n) //$n  );
@@ -307,8 +351,9 @@ sub initialize {
  	$self->{basis_columns} = [($n+1)...($n+$m)] unless ref($self->{basis_columns})=~/ARRAY/;	
  	my @rows = $self->assemble_matrix;
  	$self->M( _Matrix([@rows]) ); #original matrix
- 	$self->{data}= $self->M->data;
- 	$self->{obj_row} = _Matrix(@{$self->objective_row()});
+ 	$self->{data}= $self->M->data;	
+	my $new_obj_row = $self->objective_row;
+ 	$self->{obj_row} = _Matrix($self->objective_row);
  	# update everything else:
  	# current_basis_matrix, current_constraint_matrix,current_b
  	$self->basis($self->basis->value);
@@ -374,10 +419,10 @@ sub assemble_matrix {
 sub objective_row {
 	my $self = shift;
 	# sanity check for objective row
-	
-	
+	Value::Error("The objective row coefficients (c) should be a 1 by n Matrix or a Vector of length n")
+	     unless $self->n == $self->c->length;
 	my @last_row=();
-	push @last_row, ( -($self->{c}) )->value;  # add the negative coefficients of the obj function
+	push @last_row, ( -($self->c) )->value;  # add the negative coefficients of the obj function
 	foreach my $i (1..($self->m)) { push @last_row, 0 }; # add 0s for the slack variables
 	push @last_row, 1, 0; # add the 1 for the objective value and 0 for the initial value
 	return \@last_row;
@@ -418,6 +463,50 @@ sub current_tableau {
 	}
 	return _Matrix( @{$self->current_constraint_matrix->extract_rows},
 	               $self->current_objective_coeffs );
+}
+
+
+=item  statevars
+
+
+
+
+
+=cut
+
+sub statevars {
+   my $self = shift;
+   my $matrix = $self->current_tableau;
+   my $basis =Value::Set->new($self->basis); # a MathObject set
+   # FIXME
+   # type check ref($mat)='Matrix'; ref($basis)='Set';
+   # or check that $mat has dimensions, element methods; and $basis has a contains method
+   my ($m,$n) = $matrix->dimensions;
+   
+   @var = ();
+   #print( "start new matrix $m $n \n");
+   #print "tableau is ", $matrix, "\n";
+   foreach my $j (1..$n-2) {    # the last two columns of the tableau are object variable and constants
+      if (not $basis->contains($j)) {
+            #DEBUG_MESSAGE( "j= $j not in basis");
+            $var[$j-1]=0; next; # non-basis variables (parameters) are set to 0. 
+            
+      } else {
+            foreach my $i (1..$m-1) {  # the last row is the objective function
+               # if this is a basis column there should be only one non-zero element(the pivot)
+               if ( not $matrix->element($i,$j) == 0 ) { # should this have ->value?????
+                  $var[$j-1] = ($matrix->element($i,$n)/$matrix->element($i,$j))->value;                  
+                  #DEBUG_MESSAGE("i=$i j=$j var = $var[$j-1] ");
+                  next;
+               }
+             
+            }
+      }
+  }                    # element($n, $m-1) is the coefficient of the objective value. 
+                       # this last variable is the value of the objective function
+  push @var , ($matrix->element($m,$n)/$matrix->element($m,$n-1))->value;
+
+  [@var];
 }
 
 =item basis
@@ -474,7 +563,7 @@ sub basis {
 	my $M = $self->{M};
 	my ($row_dim, $col_dim) = $M->dimensions;
 	my $current_constraint_matrix = $Badj*$M;
-	my $c_B  = $self->obj_row->extract_columns($self->basis_columns );
+	my $c_B  = $self->{obj_row}->extract_columns($self->basis_columns );
 	my $c_B2 = Value::Vector->new([ map {$_->value} @$c_B]);
 	my $correction_coeff = ($c_B2*($current_constraint_matrix) )->row(1); 
 	my $obj_row_normalized =  abs($self->{current_basis_matrix}->det->value)*$self->{obj_row};
@@ -550,7 +639,7 @@ sub find_next_pivot {
 	my $obj_row_number =shift;
 
 	# sanity check max or min in find pivot column
-	my ($col_index, $value, $row_index, $optimum, $unbounded) = ('','','','');
+	my ($row_index, $col_index, $value, $optimum, $unbounded) = (undef,undef,undef, 0, 0);
 	($col_index, $value, $optimum) = $self->find_pivot_column($max_or_min, $obj_row_number);
 #	main::DEBUG_MESSAGE("find_next_pivot: col: $col_index, value: $value opt: $optimum ");
 	return ( $row_index, $col_index, $optimum, $unbounded) if $optimum;
@@ -629,7 +718,7 @@ sub find_pivot_column {
 	
 
 	my @obj_row = @{$obj_row_matrix->extract_rows($obj_row_index)};
-	my $index = -1;
+	my $index = undef;
 	my $optimum = 1;
 	my $value = undef;
 	my $zeroLevelTol = $zeroLevelFraction * ($self->current_basis_coeff);
@@ -674,7 +763,7 @@ sub find_pivot_row {
 	}
 	# main::DEBUG_MESSAGE("dim = ($row_dim, $col_dim)");
 	my $value = undef;
-	my $index = -1;
+	my $index = undef;
 	my $unbounded = 1;
 	my $zeroLevelTol = $zeroLevelFraction * ($self->current_basis_coeff);
 	for (my $k=1; $k<=$row_dim; $k++) {
@@ -944,6 +1033,27 @@ sub row_reduce {
 }
 # eventually these routines should be included in the Value::Matrix 
 # module?
+
+
+=item dual_problem
+
+	TableauObject = $self->dual_lop
+
+Creates the tableau of the LOP which is dual to the linear optimization problem represented by the 
+current tableau. 
+
+=cut
+
+sub dual_lop {
+	my $self = shift;
+	my $newA = $self->A->transpose; # converts m by n matrix to n by m matrix
+	my $newb = $self->c; # gives a 1 by n matrix
+	$newb = $newb->transpose; # converts to an n by 1 matrix
+	my $newc = $self->b; # gives an m by 1 matrix
+	$newc = _Matrix( $newc->transpose->value );  # convert to a 1 by m matrix
+	my $newt = Tableau->new(A=>$newA, b=>$newb, c=>$newc);
+	$newt;
+}
 
 =pod 
 

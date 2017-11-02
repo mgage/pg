@@ -17,9 +17,8 @@ use PGcore;
 require "tableau.pl";
 require "Value.pl"; #gives us Real() etc. 
 #require "Parser.pl"; #gives us Context() but also uses loadMacros();
-require "niceTables.pl";
+#require "niceTables.pl";
 
-ok(max(3,4)==4, "check max function");
 
 
 sub Context {Parser::Context->current(\%context,@_)}
@@ -67,11 +66,11 @@ $steve_profit = 4500;
 # that inputs are matrices
 $ra_matrix = [[-$bill_money_commitment,-$bill_time_commitment, -1, 0, 	   1,0,0,-$bill_profit], 
                  [-$steve_money_commitment,-$steve_time_commitment, 0, -1, 0,1,0,-$steve_profit],
-                 [-$money_total,-$time_total,0,0, 0,0, 1,0]];
+                 [-$money_total,-$time_total,-1,-1, 0,0, 1,0]];
 $A = Value::Matrix->new([[-$bill_money_commitment,-$bill_time_commitment, -1, 0],
              [ -$steve_money_commitment,-$steve_time_commitment, 0, -1 ]]);
 $b = Value::Vector->new([-$bill_profit,-$steve_profit]); # need vertical vector
-$c = Value::Vector->new([$money_total,$time_total,0,0]);
+$c = Value::Vector->new([$money_total,$time_total,1,1]);
 
 $tableau1 = Tableau->new(A=>$A, b=>$b,  c=>$c); 
 ###############################################################
@@ -86,7 +85,6 @@ is (ref($tableau1), "Tableau", 'has type Tableau' );
 
 print "stringify tableau: ", $tableau1, "\n";
 
-print lop_display($tableau1);
 
 is ($tableau1->{m}, 2,  'number of constraints is 2');
 is ($tableau1->{n}, 4,  'number of variables is 4');
@@ -213,27 +211,40 @@ diag($tableau1->current_tableau);
 is_deeply([$tableau1->find_next_short_cut_pivot()],[undef,undef,1,0], "feasible point found");
 is_deeply([$tableau1->find_next_short_cut_basis()],[1,2,'feasible_point'], 
  "all constraints positive at basis {1,2} --start phase2");
-is_deeply([$tableau1->find_pivot_column('max')], [5,Value::Real->new(-1.2E+06),0],  "col 5");
-is_deeply([$tableau1->find_pivot_row(5)], [2,Value::Real->new(8.4E06/3000),0], "row 2 ");
-is_deeply([$tableau1->find_next_pivot('max')], [2,5,0,0], "pivot (2,5)");
-is_deeply([$tableau1->find_next_basis('max')],[1,5,undef], "new basis {1,5} continue");
+is_deeply([$tableau1->find_pivot_column('max')], [3,Value::Real->new(-100000),0],  "col 3");
+is_deeply([$tableau1->find_pivot_row(3)], [1,Value::Real->new(550000/500),0], "row 1 ");
+is_deeply([$tableau1->find_next_pivot('max')], [1,3,0,0], "pivot (1,3)");
+is_deeply([$tableau1->find_next_basis('max')],[2,3,undef], "new basis {2,3} continue");
 
-$tableau1->current_tableau(1,5);
+$tableau1->current_tableau(2,3);
 diag($tableau1->current_tableau);
-is_deeply([$tableau1->find_pivot_column('max')], [6,Value::Real->new(-6000),0],  "col 6");
-is_deeply([$tableau1->find_pivot_row(6)], [-1,undef,1], "unbounded ");
+is_deeply([$tableau1->find_pivot_column('max')], [4,Value::Real->new(-300),0],  "col 4");
+is_deeply([$tableau1->find_pivot_row(4)], [1,4500,0], "row 2) ");
 
-is_deeply([$tableau1->find_next_pivot('max')], [-1,6,0,1], "unbounded");
-# this is ok -- we're looking at the dual of the bill and steve problem 
-# and the original test was to minimize it not to maximize it
-# recheck the original problem with websim!!!!
+is_deeply([$tableau1->find_next_pivot('max')], [1,4,0,0], "pivot 1,4");
+is_deeply([$tableau1->find_next_basis('max')],[3,4,undef], "new basis {3,4} continue");
 
-# regularize the output for row and column definitions if one of the flags is set.
-# can we always set those to undefined?
-# can we change the flag notification to 
-# "unbounded, feasible_point, infeasible_tableau, optimal"?
-# it might be easier to remember. 
 
+$tableau1->current_tableau(3,4);
+diag($tableau1->current_tableau);
+is_deeply([$tableau1->find_pivot_column('max')], [5,Value::Real->new(-1),0],  "col 5");
+is_deeply([$tableau1->find_pivot_row(5)], [undef,undef,1], "row 2) ");
+
+is_deeply([$tableau1->find_next_pivot('max')], [undef,5,0,1], "unbounded -- no pivot");
+is_deeply([$tableau1->find_next_basis('max')],[3,4,'unbounded'], "basis 3,4 unbounded");
+# note that the column is returned from find_next_pivot so one can find a certificate
+# of unboundedness (can return a line going off to infinity)
+
+# # this is ok -- we're looking at the dual of the bill and steve problem 
+# # and the original test was to minimize it not to maximize it
+# # recheck the original problem with websim!!!!
+# 
+# # regularize the output for row and column definitions if one of the flags is set.
+# # can we always set those to undefined?
+# # can we change the flag notification to 
+# # "unbounded, feasible_point, infeasible_tableau, optimal"?
+# # it might be easier to remember. 
+# 
 diag("reset tableau to feasible point and try to minimize it for phase2");
 $tableau1->current_tableau(1,2);
 diag($tableau1->current_tableau);
@@ -241,27 +252,15 @@ is_deeply([$tableau1->find_next_short_cut_pivot()],[undef,undef,1,0], "feasible 
 is_deeply([$tableau1->find_next_short_cut_basis()],[1,2,'feasible_point'], 
  "all constraints positive at basis {1,2} --start phase2");
  
-is_deeply([$tableau1->find_pivot_column('min')], [3,Value::Real->new(1.2E+06),0],  "col 3");
-is_deeply([$tableau1->find_pivot_row(3)], [1,Value::Real->new(550000/500),0], "row 1 ");
-is_deeply([$tableau1->find_next_pivot('min')], [1,3,0,0], "pivot (1,3)");
-is_deeply([$tableau1->find_next_basis('min')],[2,3,undef], "new basis {2,3} continue");
+is_deeply([$tableau1->find_pivot_column('min')], [undef,undef,1],  "all neg coeff");
+is_deeply([$tableau1->find_pivot_row(1)], [1,Value::Real->new(550000/1300000),0], "row 1 ");
+is_deeply([$tableau1->find_next_pivot('min')], [undef,undef,1,0], "optimum");
+is_deeply([$tableau1->find_next_basis('min')],[1,2,'optimum'], "optimum");
+# 
+# 
 
+ is_deeply($tableau1->statevars , # round off errors
+   [550000/1300000,8400000/1300000,0,0,0,0,8.339999999999999E9/1300000], "state variables");
 
-
-$tableau1->current_tableau(2,3);
-diag($tableau1->current_tableau);
-
-is_deeply([$tableau1->find_pivot_column('min')], [4,Value::Real->new(600),0],  "col 4");
-is_deeply([$tableau1->find_pivot_row(4)], [1,Value::Real->new(4500),0], "row 1 ");
-is_deeply([$tableau1->find_next_pivot('min')], [1,4,0,0], "pivot (1,4)");
-is_deeply([$tableau1->find_next_basis('min')],[3,4,undef], "new basis {3,4} continue");
-
-$tableau1->current_tableau(3,4);
-diag($tableau1->current_tableau);
-
-is_deeply([$tableau1->find_pivot_column('min')], [-1,undef,1],  "optimum");
-#is_deeply([$tableau1->find_pivot_row(4)], [1,Value::Real->new(4500),0], "row 1 ");
-is_deeply([$tableau1->find_next_pivot('min')], ['',-1,1,undef], "pivot (1,4) optimum");
-is_deeply([$tableau1->find_next_basis('min')],[3,4,'optimum'], " basis {3,4} optimum");
 
 done_testing();

@@ -55,13 +55,31 @@ Context()->texStrings;
 # $PAR
 # Enter tableau->{M} \{$t->{M}->ans_array\}
 
+$t_dual = $t->dual_lop;
+
 BEGIN_TEXT
+
+t is \[$t\] of type \{ref($t)\} $BR
+
+The tableau is \[\{$t->current_tableau\}\].$BR
+
+Dimension of b is \{$t->b->dimensions\}
+$PAR
+Dimension of c is \{$t->c->dimensions\}
+$PAR
+t_dual is \[$t_dual\] of type \{ref($t_dual)\} $BR
+t_dual->current_tableau is \[\{$t_dual->current_tableau\}\]
+$PAR
 m is \[$m\]
+
 
 $PAR
 enter m = \{$m->ans_array\}
 
-\{#$m->cmp->evaluate($m)->pretty_print\}
+\{#$m->cmp->evaluate($m)->pretty_print()\}
+
+
+
 
 END_TEXT
 Context()->normalStrings;
@@ -72,7 +90,6 @@ Context()->normalStrings;
 #  Answers
 #
 #
-#ANS($t->{M}->cmp(checker=>tableauEquivalence()) );
 ANS($m->cmp(checker=>tableauEquivalence()));
 
 

@@ -49,13 +49,13 @@ matrix [`[$m]`]
 
 vector [`[$v]`] 
   
-result [`[$m]`]*[`[$v]`] is [$m2] and  tex version: [`[$m2]`]
+result [`[$m]`]  [`[$v]`] is [$m2] and  tex version: [`[$m2]`]
 
 Convert the result to a vector [`[$v2]`] or to a column vector [`[$v2c]`]
 
 and then convert to a matrix again [$m2flat] [`[$m2flat]`]
 
-Multiplication on the left of [`[$w]`] * [`[$m]`] is [$m3], 
+Multiplication on the left of [`[$w]`] [`[$m]`] is [$m3], 
 
 the first row of which is [$m3->row(1)] and the tex version:[`[$m3]`]
 
