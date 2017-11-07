@@ -154,7 +154,7 @@ Figure out outputs: $PAR
 find_next_basis: @output_find_next_basis $PAR
 test1 \{[$tableau1->find_next_basis('max')]->[0]\},$PAR
 test2 \{[$tableau1->find_next_basis('max')]->[1] \},$PAR
-
+test3 \{@out = $tableau1->find_next_basis('max'),join(",",@out[0,1])\}
 
 $HR
 next pivot 1 :  \{ join(",",$tableau1->find_next_pivot('max'))\}$PAR

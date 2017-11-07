@@ -10,7 +10,21 @@
 
 	macros/tableau.pl
 	
+=head2 TODO
 	
+	change find_next_basis_from_pivot  to next_basis_from_pivot
+	add phase2  to some match phase1 for some of the pivots
+	add a generic _solve  that solves tableau once it has a filled basis
+	add something that will fill the basis.
+	
+	regularize the use of m and n -- should they be the number of 
+	constraints and the number of decision(problem) variables or should
+	they be the size of the complete tableau. 
+	
+	current tableau returns the complete tableau minus the objective function
+	row. (do we need a second objective function row?)
+	
+=cut	
 
 =head2 DESCRIPTION
 
@@ -104,16 +118,6 @@ Used most often when $constraints is a LinearInequality math object.
 
 =cut 
 
-=item lop_display
-	
-	Useage: 
-	
-	lop_display($tableau, align=>'cccc|cc|c|c', toplevel=>[qw(x1,x2,x3,x4,s1,s2,P,b)])
- 	
-Pretty prints the output of a matrix as a LOP with separating labels and 
-variable labels.
-
-=cut
 
 =head3 References:
 
@@ -175,14 +179,22 @@ package main;
 sub _tableau_init {};   # don't reload this file
 
 # loadMacros("tableau_main_subroutines.pl");
-
+sub tableau_equivalence {  # I think this might be better -- matches linebrea_at_commas
+                           # the two should be consistent.
+	tableauEquivalence(@_);
+}
 sub tableauEquivalence {
 	return sub {
 		my ($correct, $student, $ansHash) = @_;
-		# DEBUG_MESSAGE("executing tableau equivalence");
+		 #DEBUG_MESSAGE("executing tableau equivalence");
+		 #DEBUG_MESSAGE("$correct");
+		 #DEBUG_MESSAGE("$student");
+		Value::Error("correct answer is not a matrix") unless ref($correct)=~/Value::Matrix/;
+		Value::Error("student answer is not a matrix") unless ref($student)=~/Value::Matrix/;
+
 		# convert matrices to arrays of row references
-		my @rows1 = matrix_extract_rows($correct);
-		my @rows2 = matrix_extract_rows($student);
+		my @rows1 = $correct->extract_rows;
+		my @rows2 = $student->extract_rows;
 		# compare the rows as lists with each row being compared as 
 		# a parallel Vector (i.e. up to multiples)
 		my $score = List(@rows1)->cmp( checker =>
@@ -202,7 +214,7 @@ sub tableauEquivalence {
 # 		linebreak_at_commas()
 # 	);
 
-package main;
+
 sub linebreak_at_commas {
 	return sub {
 		my $ans=shift;
@@ -223,10 +235,25 @@ sub linebreak_at_commas {
 # 	Pretty prints the output of a matrix as a LOP with separating labels and 
 # 	variable labels.
 
+
+=item lop_display
+	
+	Useage: 
+	
+	lop_display($tableau, align=>'cccc|cc|c|c', toplevel=>[qw(x1,x2,x3,x4,s1,s2,P,b)])
+ 	
+Pretty prints the output of a matrix as a LOP with separating labels and 
+variable labels.
+
+=cut
+our $max_number_of_steps = 20;
+
 sub lop_display {
 	my $tableau = shift;
 	%options = @_;
-	$options{alignment} = ($options{alignment})? $options{alignment}:"|ccccc|cc|c|c|";
+	#TODO get alignment and toplevel from tableau
+	#override it with explicit options.
+	$alignment = ($options{align})? $options{align}:"|ccccc|cc|c|c|";
 	@toplevel = ();
 	if (exists( ($options{toplevel})) ) {
 		@toplevel = @{$options{toplevel}};
@@ -236,10 +263,106 @@ sub lop_display {
 	$last_row = $#matrix; # last row is objective coefficients 
 	$matrix[$last_row-1]->[0]=[$matrix[$last_row-1]->[0],midrule=>1];
 	$matrix[$last_row]->[0]=[$matrix[$last_row]->[0],midrule=>1];
-	DataTable([[@toplevel],@matrix],align=>$options{alignment}); 
+	DataTable([[@toplevel],@matrix],align=>$alignment); 
 }
 
-sub get_tableau_variable_values {
+# for main section of tableau.pl
+
+# make one phase2 pivot on a tableau (works in place)
+# returns flag with '', 'optimum' or 'unbounded'
+sub next_tableau {
+	my $self = shift;
+	my $max_or_min = shift; 
+	Value::Error("next_tableau requires a 'max' or 'min' argument") 
+	   unless $max_or_min=~/max|min/;
+	my @out = $self->find_next_basis($max_or_min);
+	my $flag = pop(@out);
+	if ($flag) {
+	} else {  # update matrix
+		$self->basis(Set(@out));
+	}
+	return $flag;
+}
+
+
+#iteratively phase2 pivots a feasible tableau until the
+# flag returns 'optimum' or 'unbounded'
+# tableau is returned in a "stopped" state.
+
+sub phase2_solve {
+	my $tableau = shift;
+	my $max_or_min = shift; #FIXME -- this needs a sanity check
+	Value::Error("phase2_solve requires a 'max' or 'min' argument")
+		   unless $max_or_min=~/max|min/;
+	# calculate the final state by phase2 pivoting through the tableaus. 
+	my $state_flag = '';
+	my $tableau_copy = $tableau->copy;
+	my $i=0;
+	while ((not $state_flag) and $i <=$max_number_of_steps ) {
+		$state_flag = next_tableau($tableau_copy,$max_or_min);
+		$i++;
+	}
+	return($tableau_copy,$state_flag, $i); 
+	# TEXT("Number of iterations is $i $BR");
+}
+
+# make one phase 1 pivot on a tableau (works in place)
+# returns flag with '', 'infeasible_lop' or 'feasible_point'
+# perhaps 'feasible_point' should be 'feasible_lop'
+sub next_short_cut_tableau {
+	my $self = shift;
+	my @out = $self->find_next_short_cut_basis();
+	my $flag = pop(@out);
+	# TEXT(" short cut tableau flag $flag $BR");
+	if ($flag) {
+	} else {  # update matrix
+		$self->basis(Set(@out));
+	}
+	return $flag;
+}
+sub phase1_solve {
+	my $tableau = shift;
+	my $state_flag = '';
+	my $tableau_copy = $tableau->copy;
+	my $steps = 0;
+	while (not $state_flag and $pivots <= $max_number_of_steps) {
+		$state_flag = next_short_cut_tableau($tableau_copy);
+		$steps++;
+	}
+	return( $tableau_copy, $state_flag, $steps);
+}
+
+=item primal_basis_to_dual dual_basis_to_primal
+
+	[complementary_basis_set] = $self->primal_basis_to_dual(primal_basis_set)
+	[complementary_basis_set] = $self->dual_basis_to_primal(dual_basis_set)
+
+=cut
+
+$primal2dual = sub {
+    my $i =$shift; 
+	if ($i<=$n and $i>0) {
+		return $m +$i;
+	} elsif ($i > $n and $i<= $n+$m) {
+		return $i-$n 
+	} else {
+		Value::Error("index $i is out of range");
+	}	
+};
+
+$dual2primal = sub {
+	my $j=$shift;
+	if ($j<=$m and $j>0) {
+		return $n+$j;
+	} elsif ($j>$m and $j<= $n+$m) {
+		return $j-$m
+	}else {
+		Value::Error("index $i is out of range");
+	}	
+};
+		
+# deprecated for tableaus - use $tableau->statevars instead
+sub get_tableau_variable_values { 
    my $mat = shift;  # a MathObject matrix
    my $basis =shift; # a MathObject set
    # FIXME
@@ -292,9 +415,21 @@ Tableau->mk_accessors(qw(
 
 ));
 
-our $zeroLevelFraction = Value::Real->new(1E-10);
+our $tableauZeroLevel = Value::Real->new(1E-10); 
+# consider entries zero if they are less than $tableauZeroLevel times the current_basis_coeff.
+
+
+sub close_enough_to_zero {
+	my $self = shift;
+	my $value = shift;
+	#main::DEBUG_MESSAGE("value is $value");
+	#main::DEBUG_MESSAGE("current_basis is ", $self->current_basis_coeff);
+	#main::DEBUG_MESSAGE("cutoff is ", $tableauZeroLevel*($self->current_basis_coeff));
+	return (abs($value)<= $tableauZeroLevel*($self->current_basis_coeff))? 1: 0;
+}
 
 sub class {"Matrix"};
+ 
  
 sub _Matrix {    # can we just import this?
 	Value::Matrix->new(@_);
@@ -445,7 +580,7 @@ row containing the objective function coefficients.
     -------------
 	|A | S |0| b| 
 	-------------
-	|  c   |z|z*|
+	| -c   |z|z*|
 	-------------
 
 If a list of basis columns is passed as an argument then $self->basis()
@@ -468,7 +603,7 @@ sub current_tableau {
 
 =item  statevars
 
-
+	[x1,.....xn,]= $self->statevars()
 
 
 
@@ -482,7 +617,8 @@ sub statevars {
    # type check ref($mat)='Matrix'; ref($basis)='Set';
    # or check that $mat has dimensions, element methods; and $basis has a contains method
    my ($m,$n) = $matrix->dimensions;
-   
+   # m= number of constraints + 1.  
+   # n = number of constraints + number of variables +2
    @var = ();
    #print( "start new matrix $m $n \n");
    #print "tableau is ", $matrix, "\n";
@@ -585,7 +721,7 @@ sub basis {
 
 =item find_next_basis 
 
-	($basis->value,$flag) = $self->find_next_basis (max/min, obj_row_number)
+	($col1,$col2,..,$flag) = $self->find_next_basis (max/min, obj_row_number)
 	
 In phase 2 of the simplex method calculates the next basis.  
 $optimum or $unbounded is set
@@ -593,8 +729,11 @@ if the process has found on the optimum value, or the column
 $col gives a certificate of unboundedness.
 
 $flag can be either 'optimum' or 'unbounded' in which case the basis returned is the current basis. 
-$basis->value is an ARRAY of column numbers. 
+is a list of column numbers. 
 
+FIXME  Should we change this so that ($basis,$flag) is returned instead? $basis and $flag
+are very different things. $basis could be a set or list type but in that case it can't have undef
+as an entry. It probably can have '' (an empty string)
 
 =cut 
 
@@ -602,7 +741,7 @@ $basis->value is an ARRAY of column numbers.
 sub find_next_basis {
 	my $self = shift;Value::Error( "call find_next_basis as a Tableau method") unless ref($self)=~/Tableau/;	
 	my $max_or_min = shift;
-	my $obj_row_number = shift;
+	my $obj_row_number = shift//1;
 	my ( $row_index, $col_index, $optimum, $unbounded)= 
 	     $self->find_next_pivot($max_or_min, $obj_row_number);
 	my $flag = undef;
@@ -721,7 +860,7 @@ sub find_pivot_column {
 	my $index = undef;
 	my $optimum = 1;
 	my $value = undef;
-	my $zeroLevelTol = $zeroLevelFraction * ($self->current_basis_coeff);
+	my $zeroLevelTol = $tableauZeroLevel * ($self->current_basis_coeff);
 # 	main::DEBUG_MESSAGE(" coldim: $obj_col_dim , row: $obj_row_index obj_matrix: $obj_row_matrix ".ref($obj_row_matrix) );
 # 	main::DEBUG_MESSAGE(" \@obj_row ",  join(' ', @obj_row ) );
 	for (my $k=1; $k<=$obj_col_dim; $k++) {
@@ -765,7 +904,7 @@ sub find_pivot_row {
 	my $value = undef;
 	my $index = undef;
 	my $unbounded = 1;
-	my $zeroLevelTol = $zeroLevelFraction * ($self->current_basis_coeff);
+	my $zeroLevelTol = $tableauZeroLevel * ($self->current_basis_coeff);
 	for (my $k=1; $k<=$row_dim; $k++) {
 	    my $m = $self->{current_constraint_matrix}->element($k,$column_index);
 	    # main::DEBUG_MESSAGE(" m[$k,$column_index] is ", $m->value);
@@ -773,7 +912,7 @@ sub find_pivot_row {
 		my $b = $self->{current_b}->element($k,1);
 		# main::DEBUG_MESSAGE(" b[$k] is ", $b->value);
 		# main::DEBUG_MESSAGE("finding pivot row in column $column_index, row: $k ", ($b/$m)->value);	
-		if ( not defined($value) or $b/$m < $value) {
+		if ( not defined($value) or $b/$m < $value-$zeroLevelTol) { # want first smallest value
 			$value = $b/$m;
 			$index = $k; # memorize index
 			$unbounded = 0;
@@ -814,7 +953,9 @@ sub find_leaving_column {
 	foreach my $k  (1..$col_dim) {
 		next unless $basis->contains(main::Set($k));
 		$m_ik = $self->{current_constraint_matrix}->element($row_index, $k);
-		next unless $m_ik !=0;
+		# main::DEBUG_MESSAGE("$m_ik in col $k is close to zero ", $self->close_enough_to_zero($m_ik));
+		next if $self->close_enough_to_zero($m_ik);
+		# main::DEBUG_MESSAGE("leaving column is $k");
 		$index = $k; # memorize index
 		$value = $m_ik;
 		last;
@@ -847,7 +988,7 @@ sub find_next_short_cut_pivot {
 	} else {
 		($col_index, $value, $infeasible_lop) = $self->find_short_cut_column($row_index);
 		if ($infeasible_lop){
-		$row_index=undef; $col_index=undef; $feasible_point=0;
+			$row_index=undef; $col_index=undef; $feasible_point=0;
 		}
 	}
 	return($row_index, $col_index, $feasible_point, $infeasible_lop);
@@ -872,7 +1013,8 @@ and $flag contains undef.
 
 
 sub find_next_short_cut_basis {
-	my $self = shift;Value::Error( "call find_next_short_cut_basis as a Tableau method") unless ref($self)=~/Tableau/;	
+	my $self = shift;
+	Value::Error( "call find_next_short_cut_basis as a Tableau method") unless ref($self)=~/Tableau/;	
 	
 	my ( $row_index, $col_index, $feasible_point, $infeasible_lop)= 
 	     $self->find_next_short_cut_pivot();
@@ -881,7 +1023,7 @@ sub find_next_short_cut_basis {
 	if ($feasible_point or $infeasible_lop) {
 		$basis=$self->basis();
 		if ($feasible_point) {
-			$flag = 'feasible_point';
+			$flag = 'feasible_point'; #should be feasible_lop ?
 		} elsif ($infeasible_lop){
 			$flag = 'infeasible_lop';
 		}
@@ -912,14 +1054,16 @@ sub find_short_cut_row {
 	my $index = undef;
 	my $value = undef;
 	my $feasible = 1;
+	my $zeroLevelTol = $tableauZeroLevel * ($self->current_basis_coeff);
 	for (my $k=1; $k<=$row_dim; $k++) {
 		my $b_k1 = $self->current_b->element($k,$col_index);
 		#main::diag("b[$k] = $b_k1");
-		next if $b_k1>=0; #skip positive entries; 
-		$index =$k;
-		$value = $b_k1;
-		$feasible = 0;
-		last;	
+		next if $b_k1>=-$zeroLevelTol; #skip positive entries; 
+		if ( not defined($value) or $b_k1 < $value) {
+			$index =$k;
+			$value = $b_k1;
+			$feasible = 0;  #found at least one negative entry in the row
+		}	
 	}
 	return ( $index, $value, $feasible);
 }
@@ -1051,7 +1195,9 @@ sub dual_lop {
 	$newb = $newb->transpose; # converts to an n by 1 matrix
 	my $newc = $self->b; # gives an m by 1 matrix
 	$newc = _Matrix( $newc->transpose->value );  # convert to a 1 by m matrix
-	my $newt = Tableau->new(A=>$newA, b=>$newb, c=>$newc);
+	my $newt = Tableau->new(A=>-$newA, b=>-$newb, c=>$newc);
+	# rewrites the constraints as negative
+	# the dual cost function is to be minimized.
 	$newt;
 }
 

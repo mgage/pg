@@ -33,6 +33,9 @@ sub WARN_MESSAGE{
 	warn("WARN MESSAGE: ", @_);
 }
 
+sub DEBUG_MESSAGE{
+	warn("DEBUG MESSAGE: ", @_);
+}
 Context("Matrix");
  
 Context()->flags->set(
@@ -82,6 +85,17 @@ $tableau1 = Tableau->new(A=>$A, b=>$b,  c=>$c);
 ok (1==1, "trivial first test");
 ok (defined($tableau1), 'tableau has been defined and loaded');
 is (ref($tableau1), "Tableau", 'has type Tableau' );
+
+# test "close_enough_to_zero" subroutine
+is $tableau1->close_enough_to_zero(0), 1, "checking_close_enough to zero";
+is $tableau1->close_enough_to_zero(E-9), 0, "checking_close_enough to zero";
+is $tableau1->close_enough_to_zero(-E-5), 0, "checking_close_enough to zero";
+is $tableau1->close_enough_to_zero(-E-10), 0, "checking_close_enough to zero";
+is $tableau1->close_enough_to_zero(E-10), 0, "checking_close_enough to zero";
+is $tableau1->close_enough_to_zero(0.9999E-10), 1, "checking_close_enough to zero";
+is $tableau1->close_enough_to_zero(-0.9999E-10), 1, "checking_close_enough to zero";
+
+
 
 print "stringify tableau: ", $tableau1, "\n";
 
