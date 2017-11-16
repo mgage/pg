@@ -1,0 +1,109 @@
+##############################################
+DOCUMENT();
+
+loadMacros(
+   "PGstandard.pl",     # Standard macros for PG language
+   "MathObjects.pl",
+   "parserLinearInequality.pl",
+   "PGML.pl",
+   "tableau.pl",
+   "niceTables.pl",
+   "PGmatrixmacros.pl",
+   "contextFraction.pl",
+   "parserPopUp.pl",
+   "PGessaymacros.pl",
+   #"LinearProgramming.pl",
+    #"source.pl",        # allows code to be displayed on certain sites.
+   "PGcourse.pl",
+);
+
+##############################################
+
+
+Context("LinearInequality");   
+Context()->variables->add(x1=>'Real',x2=>'Real', x3=>'Real');
+Context()->variables->add(y1=>'Real',y2=>'Real', y3=>'Real');
+Context()->flags->set(reduceFractions=>0);
+# change tolerances to simplify "close to zero" values
+Context()->flags->set(
+ 	zeroLevel=>1E-8,
+ 	zeroLevelTol=>1E-8
+ );
+ 
+# taken from Old McDonald problem and modifed slightly
+$land = 1100; #acres
+
+$preservation_costs = 1; #dollars per acre
+$preservation_revenue = 30; # dollars per acre
+$preservation_profits = $preservation_revenue - $preservation_costs;
+$preservation_hours = 12; # hours of labor per acre
+
+$farming_costs = 50; #dollars per acre
+$farming_revenue= 190; #dollars per acre 
+$farming_profits = $farming_revenue - $farming_costs; # profits
+$farming_hours = 240;  # hours of labor per acre
+
+
+$development_costs = 85; # dollars per acre in permits
+$development_revenue = 290; # dollars per acre
+$development_profits = $development_revenue - $development_costs;
+$development_hours = 180; # hours of labor per acre
+
+$capital = 40E03;  #dollars in capital available
+$workers = 75;
+$work_hours = 2E03;  #hours of labor per worker
+
+$total_hours = $workers*$work_hours;
+
+
+$A = Matrix([[1,1,1],
+      [$preservation_costs, $farming_costs, $development_costs],
+      [$preservation_hours,$farming_hours, $development_hours]]);
+$b = Matrix([$land,$capital,$total_hours]);
+$c = Matrix([($preservation_profits),
+             ($farming_profits), 
+             ($development_profits) 
+            ]);
+$tableau=Tableau->new(A=>$A, b=>$b->transpose, c=>$c);
+$primal_align ='|ccc|ccc|c|c|';
+$primal_toplevel = [qw(x1 x2 x3 x4 x5 x6 w b)];
+
+
+$tableau2 = $tableau->copy;
+$tableau2->current_tableau(2,3,5);
+($m, $n)=($tableau->m,$tableau->n);
+
+$B = $tableau2->current_basis_matrix;
+$Bp = abs($B->det)*($B)**(-1);
+
+BEGIN_PGML
+Given this initial tableau:
+
+ [@ lop_display($tableau, align=>$primal_align,toplevel=>$primal_toplevel) @]*
+ 
+ after several pivots we arrive at this tableau:
+ 
+ [@ lop_display($tableau2, align=>$primal_align,toplevel=>$primal_toplevel) @]*
+
+This is obtained by multiplying the tableau (omitting the objective function row) 
+by the inverse of a 
+[$m] by [$m] submatrix [`B`] and then multiplying by the determinant of [`B`] in order to clear the denominator
+from fractions. 
+
+Enter the 'basis matrix' [`B`]: 
+>>[@ ANS($B->cmp),$B->ans_array   @]*<<
+
+Enter the multiplying matrix [`|\det B|B^{-1}`] 
+>>[@ ANS($Bp->cmp),$Bp->ans_array @]*<<
+
+Note: From the definition of the determinant one can obtain the formula 
+[`adj(B)*B= \det(B)I`]. If [`B`] is integer valued then so is [`adj(B)`] because
+the adjugate of [`B`] is calculated from the determinants of the [$m]-1 square 
+submatrices and is a polynomial in the entries of [`B`].
+
+[@ htmlLink('https://en.wikipedia.org/wiki/Adjugate_matrix','wikipedia definition of Adjugate Matrix') @]*
+
+END_PGML
+
+
+ENDDOCUMENT();

@@ -1,0 +1,76 @@
+##DESCRIPTION
+
+
+
+##ENDDESCRIPTION
+
+
+DOCUMENT();        # This should be the first executable line in the problem.
+
+loadMacros(
+   "PGstandard.pl",     # Standard macros for PG language
+   "MathObjects.pl",
+   #"source.pl",         # used to display problem source button
+   "PGcourse.pl",      # Customization file for the course
+);
+
+TEXT(beginproblem());
+$showPartialCorrectAnswers = 1;
+
+##############################################################
+#
+#  Setup
+#
+#
+Context("Numeric");
+
+##############################################################
+#
+#  Text
+#
+#
+
+Context("Matrix")->texStrings;
+$P = Point(1,2,3);
+$V = Vector(1,2,3);
+$M = Matrix([1,2],[3,4]);
+$a = Real(1230000);
+$b = Real(123000);
+
+sub TEST {
+  my $test = shift;
+  my ($result, $error) = PG_restricted_eval($test);
+  TEXT($error? "$test: $error" : "$test: OK", $BR);
+}
+
+TEST('$a*$P');
+TEST('$P/$a');
+TEST('$a*$V');
+TEST('$V/$a');
+TEST('$a*$M');
+TEST('$M/$a');
+
+TEXT($HR);
+
+TEST('$b*$P');
+TEST('$P/$b');
+TEST('$b*$V');
+TEST('$V/$b');
+TEST('$b*$M');
+TEST('$M/$b');
+
+
+# Without the patch, all the lines involving $a should produce an error, but the ones with
+# $b should be marked OK. With the patch, all the lines should be OK.
+
+
+
+##############################################################
+#
+#  Answers
+#
+#
+
+
+
+ENDDOCUMENT();        # This should be the last executable line in the problem.

@@ -1,0 +1,139 @@
+##############################################
+DOCUMENT();
+
+loadMacros(
+   "PGstandard.pl",     # Standard macros for PG language
+   "MathObjects.pl",
+   "parserLinearInequality.pl",
+   "PGML.pl",
+   "tableau.pl",
+   "niceTables.pl",
+   "PGmatrixmacros.pl",
+   "contextFraction.pl",
+   "parserPopUp.pl",
+   "PGessaymacros.pl",
+   #"LinearProgramming.pl",
+    #"source.pl",        # allows code to be displayed on certain sites.
+   "PGcourse.pl",
+);
+
+##############################################
+
+Context("Numeric");
+
+
+# # change tolerances to simplify "close to zero" values
+Context()->flags->set(
+ 	zeroLevel=>1E-8,
+ 	zeroLevelTol=>1E-8
+ );
+#  
+# taken from Old McDonald problem and modified slightly
+$land = 1100; #acres
+
+$preservation_costs = 1; #dollars per acre
+$preservation_revenue = 30; # dollars per acre
+$preservation_profits = $preservation_revenue - $preservation_costs;
+$preservation_hours = 14; # hours of labor per acre
+
+$farming_costs = 60; #dollars per acre
+$farming_revenue= 190; #dollars per acre 
+$farming_profits = $farming_revenue - $farming_costs; # profits
+$farming_hours = 240;  # hours of labor per acre
+
+
+$development_costs = 85; # dollars per acre in permits
+$development_revenue = 290; # dollars per acre
+$development_profits = $development_revenue - $development_costs;
+$development_hours = 160; # hours of labor per acre
+
+$capital = 30E03;  #dollars in capital available
+$workers = 70;
+$work_hours = 2E03;  #hours of labor per worker
+
+$total_hours = $workers*$work_hours;
+
+
+$A = Matrix([[1,1,1],
+      [$preservation_costs, $farming_costs, $development_costs],
+      [$preservation_hours,$farming_hours, $development_hours]]);
+$b = Matrix([$land,$capital,$total_hours]);
+$c = Matrix([($preservation_profits),
+             ($farming_profits), 
+             ($development_profits) 
+            ]);
+$tableau=Tableau->new(A=>$A, b=>$b->transpose, c=>$c);
+$primal_align ='|ccc|ccc|c|c|';
+$primal_toplevel = [qw(x1 x2 x3 x4 x5 x6 w b)];
+
+
+( $tableau2, $num_of_pivots) = phase2_solve($tableau);
+($m, $n)=($tableau->m,$tableau->n);
+
+($x1, $x2, $x3, $x4, $x5, $x6,$w)= @{$final_state = $tableau2->statevars};
+@optc=($optc1, $optc2, $optc3, $optc4, $optc5, $optc6, $basis_coeff, $optb) = $tableau2->current_objective_coeffs->value;
+
+@dual_y= map {$_/$basis_coeff} @optc;
+
+$y1=$dual_y[$n];
+$y2=$dual_y[1+$n];
+$y3=$dual_y[2+$n];
+$z =$dual_y[4+$n];
+
+$optimum_lop_parameter_columns = List((Set(1..($n+$m))- Set($tableau2->basis))->value);
+$optimum_dual_lop_basis_columns = List(1,2,5);
+# how to best calculate the complementary columns? FIXME
+
+BEGIN_PGML
+Given this initial tableau:
+
+ [@ lop_display($tableau, align=>$primal_align,toplevel=>$primal_toplevel) @]*
+ 
+ after several pivots we arrive at the final optimal tableau:
+ 
+ [@ lop_display($tableau2, align=>$primal_align,toplevel=>$primal_toplevel) @]*
+ 
+ The optimum values for the problem variables are:
+ 
+x1 = [_________]{$x1}  
+x2 = [_________]{$x2}  
+x3 is[_________]{$x3}  
+w is [_________]{$w}  
+
+The optimum values for the dual LOP will be
+
+y1 = [_________]{$y1}  
+y2 = [_________]{$y2}  
+y3 = [_________]{$y3}  
+z  = [_________]{$z}  
+
+
+From the complementary slack theorem we know that the optimums of an LOP and its
+dual are 'primal-dual' pairs. 
+
+What are the basis columns of the optimum tableau for the LOP (enter a list of numbers): 
+[__________]{List($tableau2->basis)}
+
+What are the parameter columns of the optimum tableau for the LOP?
+[__________]{$optimum_lop_parameter_columns}
+
+What are the basis columns for the optimum tableau for the dual LOP?
+[__________]{$optimum_dual_lop_basis_columns}
+
+
+END_PGML
+
+# # --test statements for debugging
+# BEGIN_PGML   
+#  c1 is [$optc1] c2 is [$optc2] c3 is [$optc3] c4 is [$optc4] c5 is [$optc5] 
+#  c6 is [$optc6] basis_coeff is [$basis_coeff] and optb is [$optb]
+# 
+# [@ join(" ", @dual_y) @]
+# 
+# final state: [@List($tableau2->statevars)@]
+# 
+# test large values optb [__________________]{$optb}
+# 
+# END_PGML
+
+ENDDOCUMENT();
