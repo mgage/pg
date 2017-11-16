@@ -339,27 +339,7 @@ sub phase1_solve {
 
 =cut
 
-$primal2dual = sub {
-    my $i =$shift; 
-	if ($i<=$n and $i>0) {
-		return $m +$i;
-	} elsif ($i > $n and $i<= $n+$m) {
-		return $i-$n 
-	} else {
-		Value::Error("index $i is out of range");
-	}	
-};
 
-$dual2primal = sub {
-	my $j=$shift;
-	if ($j<=$m and $j>0) {
-		return $n+$j;
-	} elsif ($j>$m and $j<= $n+$m) {
-		return $j-$m
-	}else {
-		Value::Error("index $i is out of range");
-	}	
-};
 		
 # deprecated for tableaus - use $tableau->statevars instead
 sub get_tableau_variable_values { 
@@ -1207,6 +1187,45 @@ These are generic matrix routines.  Perhaps some or all of these should
 be added to the file Value::Matrix?
 
 =cut
+
+
+sub primal2dual {
+	my $self = shift;
+    my $n = $self->n;
+    my $m = $self->m; 
+    $p2d_translate = sub {
+    	my $i = shift;
+		if ($i<=$n and $i>0) {
+			return $m +$i;
+		} elsif ($i > $n and $i<= $n+$m) {
+			return $i-$n 
+		} else {
+			Value::Error("index $i is out of range");
+		}
+	};
+	my @array = @_;	
+	return (map {&$p2d_translate($_)} @array);   #accepts list of numbers
+}
+
+
+sub dual2primal {
+	my $self = shift;
+    my $n = $self->n;
+    my $m = $self->m; 
+	$d2p_translate = sub { 
+		my $j = shift;
+		if ($j<=$m and $j>0) {
+			return $n+$j;
+		} elsif ($j>$m and $j<= $n+$m) {
+			return $j-$m
+		}else {
+			Value::Error("index $j  is out of range");
+		}
+	};
+	my @array = @_;	
+	return (map {&$d2p_translate($_)} @array);   #accepts list of numbers
+}
+
 
 package Value::Matrix;
 
