@@ -311,7 +311,7 @@ sub phase2_solve {
 # perhaps 'feasible_point' should be 'feasible_lop'
 sub next_short_cut_tableau {
 	my $self = shift;
-	my @out = $self->find_next_short_cut_basis();
+	my @out = $self->next_short_cut_basis();
 	my $flag = pop(@out);
 	# TEXT(" short cut tableau flag $flag $BR");
 	if ($flag) {
@@ -666,7 +666,7 @@ sub basis {
 	my $matrix = $self->M->submatrix(rows=>[1..($self->m)],columns=>$self->basis_columns);
 	my $basis_det = $matrix->det;
 	if ($basis_det == 0 ){
-		Value::Error("The columns ", join(",",$self->basis_columns)." cannot form a basis");
+		Value::Error("The columns ".main::Set($self->basis_columns)." cannot form a basis");
 	}
 	$self->current_basis_matrix( $matrix  );
 	$self->current_basis_coeff(abs($basis_det));
@@ -943,9 +943,9 @@ sub find_leaving_column {
 	return( $index, $value);
 }
 
-=item find_next_short_cut_pivot 
+=item next_short_cut_pivot 
 
-	($row, $col, $feasible, $infeasible) = $self->find_next_short_cut_pivot
+	($row, $col, $feasible, $infeasible) = $self->next_short_cut_pivot
 	
 	
 Following the short-cut algorithm this chooses the next pivot by choosing the row
@@ -957,9 +957,9 @@ constraints) or $infeasible=1 (a row in the tableau shows that the LOP has empty
 	
 =cut
 
-sub find_next_short_cut_pivot {
+sub next_short_cut_pivot {
 	my $self = shift;
-	Value::Error( "call find_next_short_cut_pivot as a Tableau method") unless ref($self)=~/Tableau/;
+	Value::Error( "call next_short_cut_pivot as a Tableau method") unless ref($self)=~/Tableau/;
 
 	my ($col_index, $value, $row_index, $feasible_point, $infeasible_lop) = ('','','','');
 	($row_index, $value, $feasible_point) = $self->find_short_cut_row();
@@ -974,9 +974,9 @@ sub find_next_short_cut_pivot {
 	return($row_index, $col_index, $feasible_point, $infeasible_lop);
 }
 
-=item find_next_short_cut_basis
+=item next_short_cut_basis
 
-	($basis->value, $flag) = $self->find_next_short_cut_basis()
+	($basis->value, $flag) = $self->next_short_cut_basis()
 	
 In phase 1 of the simplex method calculates the next basis for the short cut method.  
 $flag is set to 'feasible_point' if the basis and its corresponding tableau is associated with a basic feasible point
@@ -992,12 +992,12 @@ and $flag contains undef.
 =cut 
 
 
-sub find_next_short_cut_basis {
+sub next_short_cut_basis {
 	my $self = shift;
-	Value::Error( "call find_next_short_cut_basis as a Tableau method") unless ref($self)=~/Tableau/;	
+	Value::Error( "call next_short_cut_basis as a Tableau method") unless ref($self)=~/Tableau/;	
 	
 	my ( $row_index, $col_index, $feasible_point, $infeasible_lop)= 
-	     $self->find_next_short_cut_pivot();
+	     $self->next_short_cut_pivot();
 	my $basis;
 	$flag = undef;
 	if ($feasible_point or $infeasible_lop) {
@@ -1181,13 +1181,31 @@ sub dual_lop {
 	$newt;
 }
 
-=pod 
+=pod
 
-These are generic matrix routines.  Perhaps some or all of these should
-be added to the file Value::Matrix?
+These are specialized routines used in the simplex method
 
 =cut
 
+
+=item   primal2dual
+
+		@array = $self->primal2dual(2,3,4)
+		
+Maps LOP column indices to dual LOP indicies (basis of complementary slack property)
+		
+		
+=cut
+
+=item   dual2primal
+
+		@array = $self->dual2primal(2,3,4)
+		
+Maps dual LOP column indices to primal LOP indicies (basis of complementary slack property). 
+Inverse of primal2dual method.
+		 
+
+=cut
 
 sub primal2dual {
 	my $self = shift;
@@ -1226,6 +1244,51 @@ sub dual2primal {
 	return (map {&$d2p_translate($_)} @array);   #accepts list of numbers
 }
 
+
+
+=item isOptimal
+
+		$self->isOptimal('min'| 'max')
+		Returns  1 or 0
+
+This checks to see if the state is a local minimum or maximum for the objective function
+ -- it does not check whether the stateis feasible.
+
+
+=cut
+
+sub isOptimal {
+	my $self = shift;
+	Value::Error( "call isOptimalMin as a Tableau method") unless ref($self)=~/Tableau/;
+	my $max_or_min = shift;
+	my ($index, $value, $optimum) = $self->find_pivot_column($max_or_min);
+	return $optimum;   # returns 1 or 0
+}
+
+=item isFeasible
+
+
+Checks to see if the current state is feasible or whether it requires further phase 1 processing.
+
+=cut
+
+
+
+sub isFeasible {
+	my $self = shift;
+	Value::Error( "call isFeasible as a Tableau method") unless ref($self)=~/Tableau/;
+    my ($index, $value, $feasible)= $self->find_short_cut_row;
+    return $feasible;   # returns 1 or 0
+}
+
+
+
+=pod 
+
+These are generic matrix routines.  Perhaps some or all of these should
+be added to the file Value::Matrix?
+
+=cut
 
 package Value::Matrix;
 

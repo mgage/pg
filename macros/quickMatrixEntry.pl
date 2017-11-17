@@ -12,8 +12,7 @@ sub INITIALIZE_QUICK_MATRIX_ENTRY {
 	return '';
 }
 
-# <input class="opener" type='button' name="AnSwEr0002" value="Quick Entry"
-#  rows=5 columns=9>
+
 sub MATRIX_ENTRY_BUTTON {
 	my $answer_number = shift;
 	# warn(" input reference is ". ref($answer_number));
@@ -28,12 +27,16 @@ sub MATRIX_ENTRY_BUTTON {
 	$columns=$columns//5;
 	my $answer_name = "AnSwEr".sprintf('%04d',$answer_number);
 	# warn("answer number $answer_name rows $rows columns $columns");
-	return qq!
-	$PAR
-		<input class="opener" type='button' name="$answer_name" value="Quick Entry" 
-		rows="$rows" columns="$columns">
-	$PAR!;
+	return MODES(
+		HTML => qq!$PAR
+				<input class="opener" type='button' name="$answer_name" value="Quick Entry" 
+				rows="$rows" columns="$columns">
+			$PAR!,
+		TeX => qq!$PAR Quick Matrix Entry Button $PAR!,
+	);
 }
+
+1;
 
 our $quick_entry_javascript = <<'END_JS';
 <script type="text/javascript">
