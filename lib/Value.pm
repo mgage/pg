@@ -691,7 +691,7 @@ sub class {
 
 #
 #  Get an element from a point, vector, matrix, or list
-#
+#  An index (3,4) indicates row 3, column 4 -- NOT a slice of a one dimensional list
 sub extract {
   my $M = shift; my $i; my @indices = @_;
   return unless Value::isValue($M);
