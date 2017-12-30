@@ -7,8 +7,8 @@
 sub _quickMatrixEntry_init {};   # don't reload this file
 
 sub INITIALIZE_QUICK_MATRIX_ENTRY {
-	main::HEADER_TEXT($quick_entry_javascript);
-	main::TEXT($quick_entry_form);
+	main::HEADER_TEXT(main::MODES(HTML=>$quick_entry_javascript, TeX=>''));
+	main::TEXT(MODES(HTML=>$quick_entry_form, TeX=>''));
 	return '';
 }
 
@@ -36,7 +36,7 @@ sub MATRIX_ENTRY_BUTTON {
 	);
 }
 
-1;
+
 
 our $quick_entry_javascript = <<'END_JS';
 <script type="text/javascript">
