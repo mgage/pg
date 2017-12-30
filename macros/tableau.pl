@@ -253,10 +253,14 @@ sub lop_display {
 	%options = @_;
 	#TODO get alignment and toplevel from tableau
 	#override it with explicit options.
-	$alignment = ($options{align})? $options{align}:"|ccccc|cc|c|c|";
+	$alignment = ($options{align})? $options{align}:
+	            ($tableau->align)? $tableau->align : "|ccccc|cc|c|c|";
 	@toplevel = ();
 	if (exists( ($options{toplevel})) ) {
 		@toplevel = @{$options{toplevel}};
+		$toplevel[0]=[$toplevel[0],headerrow=>1, midrule=>1];
+	} elsif ($tableau->toplevel) {
+		@toplevel =@{$tableau->toplevel};
 		$toplevel[0]=[$toplevel[0],headerrow=>1, midrule=>1];
 	}
 	@matrix = $tableau->current_tableau->value;
@@ -270,6 +274,7 @@ sub lop_display {
 
 # make one phase2 pivot on a tableau (works in place)
 # returns flag with '', 'optimum' or 'unbounded'
+
 sub next_tableau {
 	my $self = shift;
 	my $max_or_min = shift; 
@@ -325,7 +330,7 @@ sub phase1_solve {
 	my $state_flag = '';
 	my $tableau_copy = $tableau->copy;
 	my $steps = 0;
-	while (not $state_flag and $pivots <= $max_number_of_steps) {
+	while (not $state_flag and $steps <= $max_number_of_steps) {
 		$state_flag = next_short_cut_tableau($tableau_copy);
 		$steps++;
 	}
@@ -390,8 +395,8 @@ our @ISA = qw(Class::Accessor Value::Matrix Value );
 Tableau->mk_accessors(qw(
 	A b c obj_row z n m S basis_columns B M current_constraint_matrix 
 	current_objective_coeffs current_b current_basis_matrix current_basis_coeff
-	obj_col_index constraint_labels 
-	problem_var_labels slack_var_labels
+	obj_col_index toplevel align constraint_labels 
+	problem_var_labels slack_var_labels obj_symbol var_symbol
 
 ));
 
@@ -437,6 +442,8 @@ sub new {
 		current_objective_coeffs=>undef,
 		current_b => undef,
 		obj_col_index => undef, # an array reference indicating the columns (e.g 1 or n+m+1) for the objective value or values
+		toplevel => undef,
+		align    => undef,
 		constraint_labels => undef,
 		problem_var_labels => undef, 
 		slack_var_labels => undef,
@@ -462,6 +469,13 @@ sub initialize {
 	my ($m, $n)=($self->{A}->dimensions);
 	$self->n(  ($self->n) //$n  );
 	$self->m( ($self->m) //$m  );
+	my $myAlignString = "c" x $n . "|" . "c" x $m ."|"."c|c"; # usual alignment for tableau.
+	my $var_symbol = $self->{var_symbol}//'x';
+	my $obj_symbol = $self->{obj_symbol}//'z';
+	my @myTopLevel = map {$var_symbol.$_} 1..($m+$n);
+	@myTopLevel = (@myTopLevel,$obj_symbol,'b' ); 
+	$self->{toplevel} = ($self->{toplevel})//[@myTopLevel];
+	$self->{align} = ($self->{align})//$myAlignString;
  	$self->{S} = Value::Matrix->I($m);
  	$self->{basis_columns} = [($n+1)...($n+$m)] unless ref($self->{basis_columns})=~/ARRAY/;	
  	my @rows = $self->assemble_matrix;
@@ -500,6 +514,14 @@ sub assemble_matrix {
 		foreach my $j (1..$m) {
 			push @current_row, $self->{S}->element($i,$j)->value; # slack variables
 		}
+		# if $matrix->I is not defined (master branch) use this
+# 		foreach my $j (1..$m) {  #FIXME
+# 		    # 	push @current_row, $self->{S}->element($i,$j)->value; # slack variables
+#             # FIXME
+# 		    # temporary fix because $matrix->I is not defined in master branch
+# 			push @current_row, ($i==$j)?1:0;    #$self->{S}->element($i,$j)->value; # slack variables
+# 		}
+
 		push @current_row, 0, $self->{b}->row($i)->value;    # obj column and constant column
 		push @rows, [@current_row]; 
 	}
@@ -688,7 +710,7 @@ sub basis {
 	$self->{data} = $current_constraint_matrix->data;
 	$self->{current_constraint_matrix} = $current_constraint_matrix; 
 	$self->{current_objective_coeffs}= $current_objective_coeffs; 
-	$self->{current_b} = $current_constraint_matrix->column($col_dim);
+	$self->current_b( $current_constraint_matrix->column($col_dim)  );
 	
 	# the A | S | obj | b
 	# main::DEBUG_MESSAGE( "basis: current_constraint_matrix $current_constraint_matrix ".
