@@ -207,23 +207,23 @@ diag("find next short cut pivots");
 # ($row_index, $value, $feasible_point) = $self->find_short_cut_row()
 is_deeply([$tableau1->find_short_cut_row()], [1,-4700,0], "row 1");
 is_deeply([$tableau1->find_short_cut_column(1)], [1,-5000,0], "column 1 ");
-is_deeply([$tableau1->find_next_short_cut_pivot()], [1,1,0,0], "pivot (1,1)");
-is_deeply([$tableau1->find_next_short_cut_basis()],[1,6,undef], "new basis {1,6} continue");
+is_deeply([$tableau1->next_short_cut_pivot()], [1,1,0,0], "pivot (1,1)");
+is_deeply([$tableau1->next_short_cut_basis()],[1,6,undef], "new basis {1,6} continue");
 $tableau1->current_tableau(1,6);
 diag($tableau1->current_tableau);
 
 is_deeply([$tableau1->find_short_cut_row],[2,Value::Real->new(-8.4E+06),0], "find short cut row");
 is_deeply([$tableau1->find_short_cut_column(2)], [2,Value::Real->new(-1.3E+06),0], "find short cut col 2 ");
-is_deeply([$tableau1->find_next_short_cut_pivot()], [2,2,0,0], "pivot (2,2)");
-is_deeply([$tableau1->find_next_short_cut_basis()],[1,2,undef], "new basis {1,2} continue");
+is_deeply([$tableau1->next_short_cut_pivot()], [2,2,0,0], "pivot (2,2)");
+is_deeply([$tableau1->next_short_cut_basis()],[1,2,undef], "new basis {1,2} continue");
 
 $tableau1->current_tableau(1,2);
 diag($tableau1->current_tableau);
 
 
 
-is_deeply([$tableau1->find_next_short_cut_pivot()],[undef,undef,1,0], "feasible point found");
-is_deeply([$tableau1->find_next_short_cut_basis()],[1,2,'feasible_point'], 
+is_deeply([$tableau1->next_short_cut_pivot()],[undef,undef,1,0], "feasible point found");
+is_deeply([$tableau1->next_short_cut_basis()],[1,2,'feasible_point'], 
  "all constraints positive at basis {1,2} --start phase2");
 is_deeply([$tableau1->find_pivot_column('max')], [3,Value::Real->new(-100000),0],  "col 3");
 is_deeply([$tableau1->find_pivot_row(3)], [1,Value::Real->new(550000/500),0], "row 1 ");
@@ -262,8 +262,8 @@ is_deeply([$tableau1->find_next_basis('max')],[3,4,'unbounded'], "basis 3,4 unbo
 diag("reset tableau to feasible point and try to minimize it for phase2");
 $tableau1->current_tableau(1,2);
 diag($tableau1->current_tableau);
-is_deeply([$tableau1->find_next_short_cut_pivot()],[undef,undef,1,0], "feasible point found");
-is_deeply([$tableau1->find_next_short_cut_basis()],[1,2,'feasible_point'], 
+is_deeply([$tableau1->next_short_cut_pivot()],[undef,undef,1,0], "feasible point found");
+is_deeply([$tableau1->next_short_cut_basis()],[1,2,'feasible_point'], 
  "all constraints positive at basis {1,2} --start phase2");
  
 is_deeply([$tableau1->find_pivot_column('min')], [undef,undef,1],  "all neg coeff");
@@ -276,5 +276,9 @@ is_deeply([$tableau1->find_next_basis('min')],[1,2,'optimum'], "optimum");
  is_deeply($tableau1->statevars , # round off errors
    [550000/1300000,8400000/1300000,0,0,0,0,8.339999999999999E9/1300000], "state variables");
 
+is($tableau1->align, 'cccc|cc|c|c', "check align");
+is_deeply($tableau1->toplevel, [qw(x1 x2 x3 x4 x5 x6 z b)], "check toplevel");
 
+# diag($tableau1->align);
+# diag(join(" " , @{$tableau1->toplevel}));
 done_testing();
