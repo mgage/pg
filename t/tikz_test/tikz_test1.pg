@@ -1,0 +1,112 @@
+##DESCRIPTION
+
+# TEST from the tikz from a pg problem
+
+##ENDDESCRIPTION
+
+
+DOCUMENT();        # This should be the first executable line in the problem.
+
+loadMacros(
+   "PGstandard.pl",     # Standard macros for PG language
+   "MathObjects.pl",
+   "PGinfo.pl",
+   #"source.pl",         # used to display problem source button
+   "PGcourse.pl",      # Customization file for the course
+);
+
+TEXT(beginproblem());
+$showPartialCorrectAnswers = 1;
+
+##############################################################
+#
+#  Setup
+#
+#
+
+
+$working_dir = "$envir{templateDirectory}tikz_build";
+$file_name    = "potato2";
+$destination_path = "$envir{templateDirectory}set$setNumber/$file_name";
+# this destination_path is still a little fragile.
+
+( $pdflatex_command, $copy_command, $copy_command, $displayMode);
+sub tikz_graph{
+	my $drawing = TikZ_Image2->new(~~%envir);
+	# initialize
+		$drawing->{working_dir}=$working_dir;
+		$drawing->{file_name}=$file_name;
+		$drawing->{destination_path}= $destination_path;
+        $drawing->ext('png');
+		#$drawing->set_commandline_mode("wwtest"); # "wwtest" or "macbook" or "hosted2"
+	# end initialize
+	# debugging /development
+	$copy_command=$drawing->{copy_command};
+	$pdflatex_command =$drawing->{pdflatex_command};
+	$convert_command = $drawing->{convert_command};
+    $display_mode = $drawing->{displayMode};
+	# end debugging
+	$drawing->addTex(join(" ",@_));
+	$drawing->render();
+	return $drawing->{final_destination_path};
+}
+ 
+$path = tikz_graph(<<END_TIKZ);
+\begin{tikzpicture}[main_node/.style={circle,fill=blue!20,draw,minimum size=1em,inner sep=3pt]}] 
+\draw (-4,0) -- (4,0);
+\draw (0,-2) -- (0,2);
+\draw (0,0) circle (1.5);
+\draw (0, 1.5) node[anchor=south]{N} -- (2.5,0)node [above]{y};
+\draw (1.2,0.9) node[right]{\((\vec x, x_{n})\)};
+\end{tikzpicture}
+END_TIKZ
+
+
+Context("Numeric");
+
+##############################################################
+#
+#  Text
+#
+#
+
+$pdflatex_command=~s/~~&/~~~~&/g;
+Context()->texStrings;
+BEGIN_TEXT
+	Print hi 
+	$BR \{protect_underbar("working_dir = $working_dir")\}
+	$BR \{protect_underbar("file_name = $file_name")\}
+	$BR \{protect_underbar("destination_path = $destination_path")\}
+	$BR \{protect_underbar("path = $path")\};
+	$BR alias = \{protect_underbar(alias("$path"))\}
+	$PAR image = \{image("$path", width=>227, height=>114)\}
+    $PAR svg   = \{embedSVG($path)\}
+	$PAR
+	$BR pdflatex \{protect_underbar("$pdflatex_command")\}
+	$BR convert \{protect_underbar("$convert_command")\}
+	$BR copy    \{protect_underbar("$copy_command")\}
+	
+	
+	$PAR end this
+END_TEXT
+
+Context()->normalStrings;
+
+#tempDirectory	=>	 /Volumes/WW_test/opt/webwork/webwork2/htdocs/tmp/daemon_course/
+# tempURL	=>	 /webwork2_files/tmp/daemon_course/
+# templateDirectory	=>	 /Volumes/WW_test/opt/webwork/courses/daemon_course/templates/
+
+#externalLaTeXPath	=>	 /Volumes/WW_test/opt/local/texlive/2010/bin/x86_64-darwin/latex
+#externalDvipngPath	=>	 /Volumes/WW_test/opt/local/texlive/2010/bin/x86_64-darwin/dvipng
+# externalcp	=>	 /bin/cp
+# externalPdflatexPath	=>	 /Volumes/WW_test/opt/local/texlive/2010/bin/x86_64-darwin/pdflatex --shell-escape
+# externalConvert	=>	 
+##############################################################
+#
+#  Answers
+#
+#
+
+
+
+ENDDOCUMENT();        # This should be the last executable line in the problem.
