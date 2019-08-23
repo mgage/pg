@@ -1,17 +1,84 @@
 #!/bin/perl
+###############################################################################
+# WeBWorK Online Homework Delivery System
+# Copyright &copy; 2000-2018 The WeBWorK Project, http://openwebwork.sf.net/
+# $CVSHeader: pg/lib/PGcore.pm,v 1.6 2010/05/25 22:47:52 gage Exp $
+# 
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of either: (a) the GNU General Public License as published by the
+# Free Software Foundation; either version 2, or (at your option) any later
+# version, or (b) the "Artistic License" which comes with this package.
+# 
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See either the GNU General Public License or the
+# Artistic License for more details.
+################################################################################
+
+=head1 NAME
+	TikZ
+
+=head1 SYNPOSIS
+
+
+=head1 DESCRIPTION
 
 #This is a Perl Module which simplifies and automates the process of generating
-# simple images using TikZ, and converting them into a Web-Useable format
+# images using TikZ, and converting them into a Web-Useable format
 # MV; March 2014
+
+=cut 
+
+=head1 USAGE
+
+	sub tikz_graph{
+		my $drawing = TikZ_Image2->new(~~%envir);
+		# initialize
+			$drawing->{working_dir}=$working_dir;
+			$drawing->{file_name}=$file_name;
+			$drawing->{destination_path}= $destination_path;
+			$drawing->ext('png');
+			#$drawing->set_commandline_mode("wwtest"); # "wwtest" or "macbook" or "hosted2"
+		# end initialize
+		# debugging /development
+		$copy_command=$drawing->{copy_command};
+		$pdflatex_command =$drawing->{pdflatex_command};
+		$convert_command = $drawing->{convert_command};
+		$display_mode = $drawing->{displayMode};
+		# end debugging
+		$drawing->addTex(join(" ",@_));
+		$drawing->render();
+		return $drawing->{final_destination_path};
+	}
+ 
+	$path = tikz_graph(<<END_TIKZ);
+	\begin{tikzpicture}[main_node/.style={circle,fill=blue!20,draw,minimum size=1em,inner sep=3pt]}] 
+	\draw (-4,0) -- (4,0);
+	\draw (0,-2) -- (0,2);
+	\draw (0,0) circle (1.5);
+	\draw (0, 1.5) node[anchor=south]{N} -- (2.5,0)node [above]{y};
+	\draw (1.2,0.9) node[right]{\((\vec x, x_{n})\)};
+	\end{tikzpicture}
+	END_TIKZ
+
+=cut
+
+=head2 Methods:
+ 
+=cut
 
 use strict; 
 use warnings;
 use Carp;
 
 package TikZ_Image2;
-
 use WeBWorK::PG::IO;
-#The constructor is meant to be called with no parameters
+
+=item new
+	#The constructor is meant to be called with no parameters
+	
+=cut
+
 sub new {
 	my $class = shift;
 	my $rh_envir = shift;
