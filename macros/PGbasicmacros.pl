@@ -3195,7 +3195,7 @@ sub embedSVG {
 	my $backup_file_name = shift//'';  # a png version
 	my $str='';
 	if ($backup_file_name) {
-		$str = q!" oneerror="this.src='! . alias($backup_file_name). q!'!;
+		$str = q!" onerror="this.src='! . alias($backup_file_name). q!'!;
 	}
 	return MODES( HTML => q!
    			<img src="! . alias($file_name).$str.q!">!,
