@@ -27,9 +27,9 @@ $debug=0;
 
 
 $working_dir = "$envir{templateDirectory}tikz_build";
-$file_name    = "image2";
+$file_name    = "image3";
 $destination_path = "$envir{templateDirectory}set$setNumber/$file_name";
-$ext = 'png';
+$ext = 'svg';
 # this destination_path is still a little fragile.
 
 if ($debug) {
@@ -107,7 +107,9 @@ if ($path and ($ext eq "png" or $ext eq "gif") ) {
 	TEXT("tikz_image $ext = ",image("$path", width=>227, height=>114));
 }
 elsif ($path and $ext eq svg){
-	TEXT("tikz_image $ext = ",embedSVG($path) );
+	TEXT("tikz_image $ext = ", embedSVG($path), $BR,$BR);
+	TEXT("tikz_image $ext (better)", embedSVG("potato2better.svg"), $BR, $BR);
+	TEXT("tikz_image $ext (2a)", embedSVG("potato2a.svg"));
 }
 
 Context()->normalStrings;

@@ -11,13 +11,14 @@ loadMacros(
    "PGstandard.pl",     # Standard macros for PG language
    "MathObjects.pl",
    "PGinfo.pl",
+   "PGML.pl",
    #"source.pl",         # used to display problem source button
    "PGcourse.pl",      # Customization file for the course
 );
 
 TEXT(beginproblem());
 $showPartialCorrectAnswers = 1;
-
+$debug=0;
 ##############################################################
 #
 #  Setup
@@ -26,27 +27,34 @@ $showPartialCorrectAnswers = 1;
 
 
 $working_dir = "$envir{templateDirectory}tikz_build";
-$file_name    = "potato2";
+$file_name    = "image1";
 $destination_path = "$envir{templateDirectory}set$setNumber/$file_name";
+$ext = 'png';
 # this destination_path is still a little fragile.
 
-( $pdflatex_command, $copy_command, $copy_command, $displayMode);
+if ($debug) {
+TEXT("working_dir=$working_dir, $BR,
+	file_name=$file_name, $BR,
+	destination_path=$destination_path",$BR,$BR);
+TEXT("Create tikz_graph $PAR");
+}
+( $pdflatex_command, $copy_command, $convert_command, $displayMode);
 sub tikz_graph{
 	my $drawing = TikZ_Image2->new(~~%envir);
 	# initialize
 		$drawing->{working_dir}=$working_dir;
-		$drawing->{file_name}=$file_name;
+		#$drawing->{file_name}=$file_name; not needed -- included in destination_path
 		$drawing->{destination_path}= $destination_path;
-        $drawing->ext('png');
+        $drawing->ext($ext); # or gif or svg or pdf
 		#$drawing->set_commandline_mode("wwtest"); # "wwtest" or "macbook" or "hosted2"
 	# end initialize
 	# debugging /development
-	$copy_command=$drawing->{copy_command};
+	$copy_command = $drawing->{copy_command};
 	$pdflatex_command =$drawing->{pdflatex_command};
 	$convert_command = $drawing->{convert_command};
     $display_mode = $drawing->{displayMode};
 	# end debugging
-	$drawing->addTex(join(" ",@_));
+	$drawing->addTex(shift);
 	$drawing->render();
 	return $drawing->{final_destination_path};
 }
@@ -70,25 +78,34 @@ Context("Numeric");
 #
 #
 
-$pdflatex_command=~s/~~&/~~~~&/g;
+
 Context()->texStrings;
+
+if ($debug) {
 BEGIN_TEXT
 	Print hi 
 	$BR \{protect_underbar("working_dir = $working_dir")\}
 	$BR \{protect_underbar("file_name = $file_name")\}
 	$BR \{protect_underbar("destination_path = $destination_path")\}
-	$BR \{protect_underbar("path = $path")\};
-	$BR alias = \{protect_underbar(alias("$path"))\}
-	$PAR image = \{image("$path", width=>227, height=>114)\}
-    $PAR svg   = \{embedSVG($path)\}
+	$BR \{protect_underbar("path = $path") if $path\};
+	$BR alias = \{protect_underbar(alias("$path")) if $path\}
 	$PAR
 	$BR pdflatex \{protect_underbar("$pdflatex_command")\}
 	$BR convert \{protect_underbar("$convert_command")\}
 	$BR copy    \{protect_underbar("$copy_command")\}
-	
-	
-	$PAR end this
+	$BR 
+	render command \{protect_underbar("$pdflatex_command $working_dir/hardcopy.tex")\}
+	$PAR end debug report
+	$PAR
 END_TEXT
+}
+
+if ($path and ($ext eq "png" or $ext eq "gif") ) {
+	TEXT("tikz_image $ext = ",image("$path", width=>227, height=>114));
+}
+elsif ($path and $ext eq svg){
+	TEXT("tikz_image $ext = ",embedSVG($path) );
+}
 
 Context()->normalStrings;
 
