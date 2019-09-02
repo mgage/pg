@@ -70,10 +70,16 @@
 use strict; 
 use warnings;
 use Carp;
+use PGcore;
+use File::Path;
+
 
 package TikZ_Image2;
+use parent qw(PGcore);
 use WeBWorK::PG::IO;
 use String::ShellQuote;
+use File::Temp;
+
 
 our $UNIT_TESTS_ON =0;
 =item new
@@ -84,7 +90,7 @@ our $UNIT_TESTS_ON =0;
 sub new {
 	my $class = shift;
 	my $rh_envir = shift;
-	my $tex=();
+	my $tex='';
 	my $tikz_options = shift;
 	my $self = {
 			code			 =>	$tex, 
@@ -95,7 +101,7 @@ sub new {
 			pdflatex_command => WeBWorK::PG::IO::pdflatexCommand(),
 			convert_command  => WeBWorK::PG::IO::convertCommand(),
 			copy_command     => WeBWorK::PG::IO::copyCommand(),
-			# rh_envir       => $rh_envir,   # pointer to the environment
+			rh_envir         => $rh_envir,   # pointer to the environment
 			displayMode      => $rh_envir->{displayMode},
 			ext              => 'png',  # or svg or png or gif
 	};
@@ -231,7 +237,7 @@ sub render {
 	}
 	#$self->clean_up;
 
-#here I'm assuming there's some file open which generates the HTML code for the
+# here I'm assuming there's some file open which generates the HTML code for the
 # problem and its page, so render() should be called in the problem text portion
 # of a PG file.
 	#print HTML $self->include();
@@ -286,169 +292,93 @@ sub copy {
 	}
 }
 
-#Separating out the html so as not to get confused
-# sub include {
-# 	my $html= qq|<img src=img.png alt="TikZ Image">|;
-# 	return $html;
-# }
 
-##### from sendXMLRPC -- and simplified version of what is in Hardcopy.pm
-############################################################################
 
-sub create_pdf_output {
-	my $tex_file_name = shift;
-	my @errors=();   
-	print "pdf mode\n" if $UNIT_TESTS_ON;
-	my $pdf_file_name = $tex_file_name;
-	$pdf_file_name =~ s/\.\w+$/\.pdf/;    # replace extension with pdf
+##### originally from Hardcopy.pm  #####
+### creating the temporary Directory is proving difficult###
+### File::Path won't work inside the Safe compartment (it uses 'use' for error error messages)
+### File::Temp did not seem to be working either -- but it should be considered
+### possibly mkpath or mkdir -p could be used 
+###
+###
+
+
+###### tempDirectory storage for tempDirectory since this inherits from PGcore
+###### 
+sub tempDirectory {
+	my $self = shift;
+	$self->{working_dir};
+}
+
+
+# This subroutine is being tested in pg/t/tikz_test4.pg
+sub create_working_directory {
+	my $self=shift();
+
+# we want to make the temp directory web-accessible, for error reporting
+	# use mkpath to ensure it exists (mkpath is pretty much ``mkdir -p'')"
 	
-	##########################################
-	# create working directory
-	# input() -- should be able to rely on defaults
-	# output()  $working_dir_path
-	##########################################
-	
-	# create a randomly-named working directory in the TEMPOUTPUTDIR() directory
-	my $working_dir_path = eval { tempdir("work.XXXXXXXX", DIR => TEMPOUTPUTDIR()) };
+	my $temp_dir_parent_path = "tikz_hardcopy";
+	warn "tempdirectory $temp_dir_parent_path";
+	my $dir;
+	# eval { $dir = File::Temp->newdir() };
+	# eval { File::Path::mkpath($temp_dir_parent_path )};
+	eval { $self->surePathToTmpFile("$temp_dir_parent_path/hardcopy.tex") };
 	if ($@) {
-		push @errors, "Couldn't create temporary working directory: $@";
+		die "Couldn't create hardcopy directory $temp_dir_parent_path: $@";
+	}
+	warn "temp_dir_parent_path = $temp_dir_parent_path";
+	
+	# create a randomly-named working directory in the hardcopy directory
+	my $temp_dir_path = eval { tempdir("work.XXXXXXXX", DIR => $temp_dir_parent_path) };
+	if ($@) {
+		$self->add_errors("Couldn't create temporary working directory: ".$self->encode_pg_and_html($@));
+		return;
 	}
 	# make sure the directory can be read by other daemons e.g. lighttpd
-	chmod 0755, $working_dir_path;
-
+	chmod 0755, $temp_dir_path;
+	
 	# do some error checking
-	unless (-e $working_dir_path) {
-		push @errors, "Temporary directory ".$working_dir_path
-			." does not exist, but creation didn't fail. This shouldn't happen.";
+	unless (-e $temp_dir_path) {
+		$self->add_errors("Temporary directory '".CGI::code(CGI::escapeHTML($temp_dir_path))
+			."' does not exist, but creation didn't fail. This shouldn't happen.");
+		return;
 	}
-	unless (-w $working_dir_path) {
-		push @errors, "Temporary directory ".$working_dir_path
-			." is not writeable.";
-
+	unless (-w $temp_dir_path) {
+		$self->add_errors("Temporary directory '".CGI::code(CGI::escapeHTML($temp_dir_path))
+			."' is not writeable.");
+		$self->delete_temp_dir($temp_dir_path);
+		return;
 	}
-	
-	# catch errors if directory is not made (should be global, outside subroutine)
-	if (@errors) {
-		print "There were errors in creating the working directory for processing tex to pdf. \n".
-	      join("\n", @errors);
-	    delete_temp_dir($working_dir_path);
-	    return 0; # FAIL if no working directory
-	}
+	my $tex_file_name = "hardcopy.tex";
+	$self->{tex_file_name} = $tex_file_name;
+	$self->{tex_file_path} = "$temp_dir_path/$tex_file_name";
 	
 	
-	########################################
-	# try to mv the tex file into the working directory
-	########################################
-
-	my $src_path = TEMPOUTPUTDIR().$tex_file_name;
-	my $dest_path = "$working_dir_path/$tex_file_name";
-	my $mv_cmd = "2>&1 mv ". shell_quote("$src_path", "$dest_path");
-	my $mv_out = readpipe $mv_cmd;
-	if ($?) {
-		push @errors, "Failed to rename $src_path  to "
-			."$dest_path in directory \n"
-			."$mv_out";
-		print join("\n",@errors);
-	}
-
-	##########################################
-	# process tex file to pdf  (if working directory was created)
-	##########################################
-	@errors =();  # reset errors
-	
-	my $tex_file_path = $dest_path;
-	my $pdf_path = "$working_dir_path/$pdf_file_name";
-	print "pdflatex $tex_file_path\n" if $UNIT_TESTS_ON;
-	
-	# call pdflatex - we don't want to chdir in the mod_perl process, as
-	# that might step on the feet of other things (esp. in Apache 2.0)
-	my $pdflatex_cmd = "cd " . shell_quote($working_dir_path) . " && "
-		. "pdflatex"
-		. " $tex_file_name >pdflatex.stdout 2>pdflatex.stderr hardcopy";
-	if (my $rawexit = system $pdflatex_cmd) {
-		my $exit = $rawexit >> 8;
-		my $signal = $rawexit & 127;
-		my $core = $rawexit & 128;
-		push @errors, "Failed to convert TeX to PDF with command $pdflatex_cmd))"
-			." (exit=$exit signal=$signal core=$core).";
-		
-		# read hardcopy.log and report first error
-		my $hardcopy_log = "$working_dir_path/$tex_file_name";
-		$hardcopy_log =~ s/\.tex$/\.log/;   # replace extension
-		if (-e $hardcopy_log) {
-			if (open my $LOG, "<", $hardcopy_log) {
-				my $line;
-				while ($line = <$LOG>) {
-					last if $line =~ /^!\s+/;
-				}
-				my $first_error = $line;
-				while ($line = <$LOG>) {
-					last if $line =~ /^!\s+/;
-					$first_error .= $line;
-				}
-				close $LOG;
-				if (defined $first_error) {
-					push @errors, "First error in TeX log is: $first_error";
-				} else {
-					push @errors, "No errors encoundered in TeX log.";
-				}
-			} else {
-				push @errors, "Could not read TeX log: $!";
-			}
-		} else {
-			push @errors, "No TeX log was found.";
-		}
-	}
-	
-	########################################
-	# try to rename the pdf file
-	########################################
-
-	my $src_path1 = $pdf_path;
-	my $final_pdf_path = TEMPOUTPUTDIR().$pdf_file_name;
-	my $mv_cmd1 = "2>&1 mv ". shell_quote("$src_path1", "$final_pdf_path");
-	my $mv_out1 = readpipe $mv_cmd1;
-	if ($?) {
-		push @errors, "Failed to rename $src_path  to "
-			."$final_pdf_path in directory \n"
-			."$mv_out1";
-	}
-	
-
-	##################################################	
-	# remove the temp directory if there are no errors
-	##################################################
-	if (@errors) {
-		print "Errors in converting the tex file to pdf: ".join("\n", @errors);
-		return 0;
-	}
-	
-	unless (@errors or $UNIT_TESTS_ON) {
-		delete_temp_dir($working_dir_path);
-	} 
-	
- 
-	
-	
-	# return path to pdf file
-	print "pdflatex to $final_pdf_path DONE\n" if $UNIT_TESTS_ON;
-	# this is doable but will require changing directories
-	# look at the solution done using hardcopy
-	return $final_pdf_path;}
-
-# helper function to remove temp dirs
-sub delete_temp_dir {
-	my ($temp_dir_path) = @_;
-	
-	my $rm_cmd = "2>&1 rm -rf " . shell_quote($temp_dir_path);  #can use perl command for this??
-	my $rm_out = readpipe $rm_cmd;
-	if ($?) {
-		print "Failed to remove temporary directory '".$temp_dir_path."':\n$rm_out\n";
-		return 0;
-	} else {
-		return 1;
-	}
+	my $out = {
+		temp_dir_path => $temp_dir_path,
+		tex_file_name => $tex_file_name,
+		tex_file_path => $temp_dir_path/$tex_file_name
+	};
+	return 1;
 }
+
+sub add_errors {
+	my ($self, @errors) = @_;
+	push @{$self->{hardcopy_errors}}, @errors;
+}
+
+sub get_errors {
+	my ($self) = @_;
+	return $self->{hardcopy_errors} ? @{$self->{hardcopy_errors}} : ();
+}
+
+sub get_errors_ref {
+	my ($self) = @_;
+	return $self->{hardcopy_errors};
+}
+
+
 
 
 1;
