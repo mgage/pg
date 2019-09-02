@@ -26,48 +26,59 @@ $debug=0;
 #
 
 
-$working_dir = "$envir{templateDirectory}tikz_build";
-$file_name    = "image3";
+#$working_dir = "$envir{templateDirectory}tikz_build";
+#$file_name    = "image3";
 $destination_path = "$envir{templateDirectory}set$setNumber/$file_name";
 $ext = 'svg';
 # this destination_path is still a little fragile.
 
-if ($debug) {
-TEXT("working_dir=$working_dir, $BR,
-	file_name=$file_name, $BR,
-	destination_path=$destination_path",$BR,$BR
-);
+# if ($debug) {
+# TEXT(file_name=$file_name, $BR,
+# 	destination_path=$destination_path",$BR,$BR
+# );
+#
+# TEXT("Create tikz_graph $PAR");
+# }
+# 
+# sub tikz_test {
+# 	my $test_tikz = TikZ_Image2->new(~~%envir);
+# 	$test_tikz->{working_dir}= $PG->tempDirectory();
+# 	$test_tikz->addTex("");
+# 	warn "run tikz test";
+# 	my $result = $test_tikz->create_working_directory();
+# 	warn "end run tikz test";
+# 	unless ($result) {
+# 		TEXT(  "tikz test ", $BR);
+# 		TEXT( $test_tikz->get_errors, $BR  );
+# 		TEXT("done test", $BR);
+# 	} 
+# 	else {
+# 		TEXT("tex_file_path for test", $test_tikz->{tex_file_path})
+# 	}
+# 	TEXT("parent directory", $test_tikz->{working_dir}, $BR);
+# 	return $result;
+# }
+# 
+# $tikz_out = tikz_test();
+# TEXT( "temp directory",$PG->tempDirectory,$BR );
+# TEXT( "tikz_out code ", $tikz_out, $BR  );
+# TEXT("done tikz_test ", $BR);
 
-TEXT("Create tikz_graph $PAR");
-}
-
-sub tikz_test {
-	my $test_tikz = TikZ_Image2->new(~~%envir);
-	$test_tikz->{working_dir}= $PG->tempDirectory();
-	$test_tikz->addTex("");
-	my $result = $test_tikz->create_working_directory();
-	unless ($result) {
-		TEXT(  "tikz test ", $BR);
-		TEXT( $test_tikz->get_errors, $BR  );
-		TEXT("done test", $BR);
-	} else {
-		TEXT($test_tikz->{tex_file_path})
-	}
-	TEXT("parent directory", $test_tikz->{working_dir}, $BR);
-	return $result;
-}
-
-$tikz_out = tikz_test();
-TEXT( "temp directory",$PG->tempDirectory,$BR );
-TEXT( "tikz_out code ", $tikz_out, $BR  );
-TEXT("done test", $BR);
-
-
+warn "begin tikz_graph";
 ( $pdflatex_command, $copy_command, $convert_command, $displayMode);
 sub tikz_graph{
 	my $drawing = TikZ_Image2->new(~~%envir);
 	# initialize
-		$drawing->{working_dir}=$working_dir;
+		$drawing->{working_dir} = $PG->tempDirectory();
+		my $result = $drawing->create_working_directory();
+		warn "end tikz_graph rendering";
+		unless ($result) {
+			warn "unable to create working directory";
+			warn $drawing->get_errors;
+		}
+		else {
+			TEXT("tex_file_path", $drawing->{tex_file_path});
+		}
 		#$drawing->{file_name}=$file_name; not needed -- included in destination_path
 		$drawing->{destination_path}= $destination_path;
         $drawing->ext($ext); # or gif or svg or pdf
@@ -86,7 +97,7 @@ sub tikz_graph{
 
 
 
-
+warn "enter tikz_graph data";
 $path = tikz_graph("
 \begin{tikzpicture}[main_node/.style={circle,fill=blue!20,draw,minimum size=1em,inner sep=3pt]}] 
 \node[main_node] (1) at (0,0) {1}; 

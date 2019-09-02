@@ -299,19 +299,21 @@ sub create_working_directory {
 # we want to make the temp directory web-accessible, for error reporting
 	# use mkpath to ensure it exists (mkpath is pretty much ``mkdir -p'')"
 	
-	my $temp_dir_parent_path = "tikz_hardcopy";
-	warn "tempdirectory $temp_dir_parent_path";
-	my $dir;
+	#my $temp_dir_parent_path = "tikz_hardcopy";
+	#warn "tempdirectory $temp_dir_parent_path";
+
 	# eval { $dir = File::Temp->newdir() };
 	# eval { File::Path::mkpath($temp_dir_parent_path )};
-	eval { $self->surePathToTmpFile("$temp_dir_parent_path/hardcopy.tex") };
+	eval { $self->surePathToTmpFile("tikz_hardcopy/hardcopy.tex") };
 	if ($@) {
-		die "Couldn't create hardcopy directory $temp_dir_parent_path: $@";
+		warn "Couldn't create hardcopy directory tikz_hardcopy: $@";
 	}
-	warn "temp_dir_parent_path = ".$self->tempDirectory.$temp_dir_parent_path;
+	my $temp_dir_parent_path = ($self->tempDirectory)."tikz_hardcopy";
+	warn "temp_dir_parent_path = $temp_dir_parent_path";
+	warn "ready to create new work directory";
 	
 	my $temp_dir_path = File::Temp->newdir('work.XXXXX',
-	      DIR=> $self->tempDirectory.$temp_dir_parent_path,
+	      DIR=> $temp_dir_parent_path,
 	      CLEANUP => 0);
 	warn "working directory temp_dir_path $temp_dir_path";
 	
