@@ -71,14 +71,14 @@ use strict;
 use warnings;
 use Carp;
 use PGcore;
-use File::Path;
-
 
 package TikZ_Image2;
 use parent qw(PGcore);
-use WeBWorK::PG::IO;
+use WeBWorK::PG::IO(); # don't import subroutines directly
 use String::ShellQuote;
-use File::Temp;
+use File::Spec;
+use File::Path;
+use File::Temp qw/tempdir/;
 
 
 our $UNIT_TESTS_ON =0;
@@ -111,7 +111,6 @@ sub new {
 #FIXME -- passing in the actual commands to TikZ_Image2.pm
 #FIXME -- is extremely dangerous.  It gives command line access
 #FIXME -- to authors to insert just about any command.
-#FIXME -- allow ext to be overridden
 #typical values for command line apps
 
 
@@ -135,28 +134,7 @@ sub new {
 # externalConvert	=>	 
 
 my $extern_pdflatex='';
-# sub set_commandline_mode {
-# 	my $self = shift;
-# 	my $commandline_mode = shift;    #FIXME this section is temporary
-# 	my $working_dir = $self->{working_dir};
-# 	if ($commandline_mode eq 'wwtest') {		
-# 		$extern_pdflatex="/Volumes/WW_test/opt/local/bin/pdflatex --shell-escape";
-# 		$self->{convert_command}  = "convert $working_dir/hardcopy.pdf "; #add destination file later
-# 		$self->{copy_command}     = "cp ";
-# 	} elsif ( $commandline_mode eq 'macbook') {
-# 		$extern_pdflatex ="/Library/TeX/texbin/pdflatex --shell-escape";
-# 		$self->{convert_command}  = "/usr/local/bin/convert $working_dir/hardcopy.pdf ";
-# 		$self->{copy_command}     = "cp ";
-# 	} elsif ( $commandline_mode eq 'hosted2') {
-# 		$extern_pdflatex="/usr/local/bin/pdflatex --shell-escape";
-# 		$self->{convert_command}  = "/usr/local/bin/convert $working_dir/hardcopy.pdf "; #add destination file later
-# 		$self->{copy_command}     = "cp ";
-# 	}
-# 	$self->{pdflatex_command} =  "cd " . $working_dir . " && "
-# 		. $extern_pdflatex. " >pdflatex.stdout 2>pdflatex.stderr hardcopy.tex";
-# }
-# Insert your TikZ image code, not including begin and end tags, as a single
-# string parameter for this method. Works best single quoted.
+
 sub addTex {
 	my $self= shift;
 	$self->{code} .= shift;
@@ -176,7 +154,7 @@ sub header {
 	my @output=();
 	push @output, "\\documentclass{standalone}\n";
 	push @output, "\\usepackage{tikz}\n";
-#	push @output, "\\usepackage{comment}\n"; # often used in tikz graphs
+	push @output, "\\usepackage{comment}\n"; # often used in tikz graphs
 	push @output, "\\begin{document}\n";
 #	push @output, "\\begin{tikzpicture}[".$self->{tikz_options}."]\n";
 	@output;
@@ -190,12 +168,7 @@ sub footer {
 	@output;
 }
 
-# how should this module get the pdflatex command
-# and the convert command -- it needs access to site.conf
-# or else those locations need to be shared with PGcore
-# Call this method in the location where you want to generate your HTML code
-# OR, comment out print HTML $self->include() and use it when your image is 
-# complete
+
 sub render {
 	my $self = shift;
 	my $working_dir =  $self->{working_dir};
@@ -257,6 +230,14 @@ sub convert {
 	}
 	return -r "$working_file_path.$ext";
 }
+
+############# notes
+# pdf2svg does a much better job of creating vector svg.  convert produces svg, but a rastor
+# image of the pdf file.  I was unable to get inkscape to convert properly from the command line.
+# All many to system should perhaps be replaced by perl calls or moved to IO.pm to 
+# limit the number of direct accesses to the disk from PG
+#############
+
 
 sub clean_up {
 	my $self = shift;
@@ -327,39 +308,38 @@ sub create_working_directory {
 	if ($@) {
 		die "Couldn't create hardcopy directory $temp_dir_parent_path: $@";
 	}
-	warn "temp_dir_parent_path = $temp_dir_parent_path";
+	warn "temp_dir_parent_path = ".$self->tempDirectory.$temp_dir_parent_path;
 	
-	# create a randomly-named working directory in the hardcopy directory
-	my $temp_dir_path = eval { tempdir("work.XXXXXXXX", DIR => $temp_dir_parent_path) };
-	if ($@) {
-		$self->add_errors("Couldn't create temporary working directory: ".$self->encode_pg_and_html($@));
-		return;
-	}
+	my $temp_dir_path = File::Temp->newdir('work.XXXXX',
+	      DIR=> $self->tempDirectory.$temp_dir_parent_path,
+	      CLEANUP => 0);
+	warn "working directory temp_dir_path $temp_dir_path";
+	
 	# make sure the directory can be read by other daemons e.g. lighttpd
 	chmod 0755, $temp_dir_path;
 	
 	# do some error checking
 	unless (-e $temp_dir_path) {
-		$self->add_errors("Temporary directory '".CGI::code(CGI::escapeHTML($temp_dir_path))
+		$self->add_errors("Temporary directory '".$self->encode_pg_and_html($temp_dir_path)
 			."' does not exist, but creation didn't fail. This shouldn't happen.");
 		return;
 	}
-	unless (-w $temp_dir_path) {
-		$self->add_errors("Temporary directory '".CGI::code(CGI::escapeHTML($temp_dir_path))
-			."' is not writeable.");
-		$self->delete_temp_dir($temp_dir_path);
-		return;
-	}
-	my $tex_file_name = "hardcopy.tex";
-	$self->{tex_file_name} = $tex_file_name;
-	$self->{tex_file_path} = "$temp_dir_path/$tex_file_name";
+ 	unless (-w $temp_dir_path) {
+ 		$self->add_errors("Temporary directory '".$self->encode_pg_and_html($temp_dir_path)
+ 			."' is not writeable.");
+ 		$self->delete_temp_dir($temp_dir_path);
+ 		return;
+ 	}
+ 	$self->{working_dir} = $temp_dir_path;
+ 	my $tex_file_name = "hardcopy.tex";
+ 	$self->{tex_file_name} = $tex_file_name;
+# 	$self->{tex_file_path} = "$temp_dir_path/$tex_file_name";
+# 	my $out = {
+# 		temp_dir_path => $temp_dir_path,
+# 		tex_file_name => $tex_file_name,
+# 		tex_file_path => $temp_dir_path/$tex_file_name
+# 	};
 	
-	
-	my $out = {
-		temp_dir_path => $temp_dir_path,
-		tex_file_name => $tex_file_name,
-		tex_file_path => $temp_dir_path/$tex_file_name
-	};
 	return 1;
 }
 
