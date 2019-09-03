@@ -64,20 +64,24 @@ $ext = 'svg';
 # TEXT( "tikz_out code ", $tikz_out, $BR  );
 # TEXT("done tikz_test ", $BR);
 
-warn "begin tikz_graph";
+#warn "begin tikz_graph";
 ( $pdflatex_command, $copy_command, $convert_command, $displayMode);
 sub tikz_graph{
 	my $drawing = TikZ_Image2->new(~~%envir);
 	# initialize
 		$drawing->{working_dir} = $PG->tempDirectory();
 		my $result = $drawing->create_working_directory();
-		warn "end tikz_graph rendering";
+		#warn "end tikz_graph rendering";
 		unless ($result) {
 			warn "unable to create working directory";
-			warn $drawing->get_errors;
+		}
+		if ($drawing->get_errors() ){
+		
+			warn "Errors in TikZ code";
+			warning $drawing->get_errors;
 		}
 		else {
-			TEXT("tex_file_path", $drawing->{tex_file_path});
+			# TEXT("tex_file_path", $drawing->{tex_file_path});
 		}
 		#$drawing->{file_name}=$file_name; not needed -- included in destination_path
 		$drawing->{destination_path}= $destination_path;
@@ -91,13 +95,23 @@ sub tikz_graph{
     $display_mode = $drawing->{displayMode};
 	# end debugging
 	$drawing->addTex(shift);
-	$drawing->render();
+	unless( $drawing->render()) {
+		if ($drawing->get_errors() ){
+		
+			warn "Errors in TikZ code";
+			warning $drawing->get_errors;
+		}
+		else {
+			warn "Something went wrong with the rendering";
+		}
+		return undef;
+	};
 	return $drawing->{final_destination_path};
 }
 
 
 
-warn "enter tikz_graph data";
+#warn "enter tikz_graph data";
 $path = tikz_graph("
 \begin{tikzpicture}[main_node/.style={circle,fill=blue!20,draw,minimum size=1em,inner sep=3pt]}] 
 \node[main_node] (1) at (0,0) {1}; 
@@ -143,12 +157,12 @@ END_PGML
 }
 
 if ($path and ($ext eq "png" or $ext eq "gif") ) {
-	TEXT("tikz_image $ext = ",image("$path", width=>227, height=>114));
+	TEXT("new tikz_image $ext = ",image("$path", width=>227, height=>114));
 }
 elsif ($path and $ext eq svg){
-	TEXT("tikz_image $ext = ", embedSVG($path), $BR,$BR);
-	TEXT("tikz_image $ext (better)", embedSVG("potato2better.svg"), $BR, $BR);
-	TEXT("tikz_image $ext (2a)", embedSVG("potato2a.svg"));
+	TEXT("new tikz_image $ext = ", embedSVG($path), $BR,$BR);
+	TEXT("stored_tikz_image $ext (better)", embedSVG("potato2better.svg"), $BR, $BR);
+	TEXT("stored_tikz_image $ext (2a)", embedSVG("potato2a.svg"));
 }
 
 Context()->normalStrings;

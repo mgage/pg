@@ -188,23 +188,26 @@ sub render {
 	print STDERR "render command:  $render_tex_cmd  \n";
 	eval {
 		my $result = system "$render_tex_cmd";  # produces a .pdf file
-		print STDERR "result from render_tex_cmd  is $result  (256 is bad) command is $render_tex_cmd ";
+		# print STDERR "result from render_tex_cmd  is $result  (256 is bad) command is $render_tex_cmd ";
 	};
 	if ($@) {
 		print STDERR "error in rendering tikz file with command $render_tex_cmd \n\n $@"
 	}
 	unless (-r "$working_dir/tikz_hardcopy.pdf" ) {
 		warn "file $working_dir/tikz_hardcopy.pdf was not created<br/>\n";
+		return 0;
 	} else {
-		warn "file $working_dir/hardcopy.pdf created<br/>\n";
+		#warn "file $working_dir/hardcopy.pdf created<br/>\n";
 		unless ($self->convert) {
 			warn "convert operation failed<br/>\n";
+			return 0;
 		} else {
-			warn "convert operation success<br/>\n";	
+			#warn "convert operation success<br/>\n";	
 			unless ($self->copy) {
 				warn "copy operation failed<br/>\n";
+				return 0;
 			} else {
-				warn "copy operation succeeded<br/>\n";
+				#warn "copy operation succeeded<br/>\n";
 			}
 		}
 	}
@@ -214,6 +217,7 @@ sub render {
 # problem and its page, so render() should be called in the problem text portion
 # of a PG file.
 	#print HTML $self->include();
+  return 1;	
 }
 sub convert {
 	my $self = shift;
@@ -222,7 +226,7 @@ sub convert {
 	my $ext = $self->{ext};   # or png or gif or svg?
 	my $convert_command = $self->{convert_command};
 	if ($ext eq 'png' or $ext eq 'gif'){
-		warn "converting: ","$convert_command $working_file_path.pdf $working_file_path.$ext","\n"; 
+		# warn "converting: ","$convert_command $working_file_path.pdf $working_file_path.$ext","\n"; 
 		system "$convert_command $working_file_path.pdf $working_file_path.$ext";
 	}
 	elsif($ext eq 'svg'){
@@ -258,7 +262,7 @@ sub copy {
 	my $destination_path = $self->{destination_path};
 	my $copy_command = $self->{copy_command};
 	if ($self->{displayMode} ne 'TeX') {
-		warn "copy: $copy_command $working_dir/tikz_hardcopy.$ext $destination_path.$ext\n";	
+		# warn "copy: $copy_command $working_dir/tikz_hardcopy.$ext $destination_path.$ext\n";	
 		system "$copy_command $working_dir/tikz_hardcopy.$ext $destination_path.$ext";
 		#system "$copy_command $working_dir/hardcopy.pdf  $destination_path.pdf";
 		#system "$copy_command $working_dir/hardcopy.svg $destination_path.svg";
@@ -266,7 +270,7 @@ sub copy {
 		$self->{final_destination_path}= "$destination_path.$ext";
 		return -r "$destination_path.$ext";
 	} else {
-		warn "copy: $copy_command $working_dir/tikz_hardcopy.pdf $destination_path.pdf\n";	
+		# warn "copy: $copy_command $working_dir/tikz_hardcopy.pdf $destination_path.pdf\n";	
 		system "$copy_command $working_dir/tikz_hardcopy.pdf $destination_path.pdf";
 		$self->{final_destination_path}= "$destination_path.pdf";
 		return -r "$destination_path.pdf";
@@ -302,44 +306,45 @@ sub create_working_directory {
 	#my $temp_dir_parent_path = "tikz_hardcopy";
 	#warn "tempdirectory $temp_dir_parent_path";
 
-	# eval { $dir = File::Temp->newdir() };
-	# eval { File::Path::mkpath($temp_dir_parent_path )};
+	# Make sure that the directory tmp/tikz_hardcopy exists where tmp
+	# is set as the tempDirectory for the current course. 
 	eval { $self->surePathToTmpFile("tikz_hardcopy/hardcopy.tex") };
 	if ($@) {
 		warn "Couldn't create hardcopy directory tikz_hardcopy: $@";
 	}
-	my $temp_dir_parent_path = ($self->tempDirectory)."tikz_hardcopy";
-	warn "temp_dir_parent_path = $temp_dir_parent_path";
-	warn "ready to create new work directory";
 	
-	my $temp_dir_path = File::Temp->newdir('work.XXXXX',
+	# full path to the directory containing the work directory
+	my $temp_dir_parent_path = ($self->tempDirectory)."tikz_hardcopy";
+	
+	my $work_dir_path = File::Temp->newdir('work.XXXXX',
 	      DIR=> $temp_dir_parent_path,
 	      CLEANUP => 0);
-	warn "working directory temp_dir_path $temp_dir_path";
+	      
+	# warn "working directory work_dir_path $work_dir_path";
 	
 	# make sure the directory can be read by other daemons e.g. lighttpd
-	chmod 0755, $temp_dir_path;
+	chmod 0755, $work_dir_path;
 	
 	# do some error checking
-	unless (-e $temp_dir_path) {
-		$self->add_errors("Temporary directory '".$self->encode_pg_and_html($temp_dir_path)
+	unless (-e $work_dir_path) {
+		$self->add_errors("Temporary directory '".$self->encode_pg_and_html($work_dir_path)
 			."' does not exist, but creation didn't fail. This shouldn't happen.");
 		return;
 	}
- 	unless (-w $temp_dir_path) {
- 		$self->add_errors("Temporary directory '".$self->encode_pg_and_html($temp_dir_path)
+ 	unless (-w $work_dir_path) {
+ 		$self->add_errors("Temporary directory '".$self->encode_pg_and_html($work_dir_path)
  			."' is not writeable.");
- 		$self->delete_temp_dir($temp_dir_path);
+ 		$self->delete_temp_dir($work_dir_path);
  		return;
  	}
- 	$self->{working_dir} = $temp_dir_path;
+ 	$self->{working_dir} = $work_dir_path;
  	my $tex_file_name = "hardcopy.tex";
  	$self->{tex_file_name} = $tex_file_name;
-# 	$self->{tex_file_path} = "$temp_dir_path/$tex_file_name";
+# 	$self->{tex_file_path} = "$work_dir_path/$tex_file_name";
 # 	my $out = {
-# 		temp_dir_path => $temp_dir_path,
+# 		work_dir_path => $work_dir_path,
 # 		tex_file_name => $tex_file_name,
-# 		tex_file_path => $temp_dir_path/$tex_file_name
+# 		tex_file_path => $work_dir_path/$tex_file_name
 # 	};
 	
 	return 1;
