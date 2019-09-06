@@ -583,6 +583,7 @@ sub encode_base64 ($;$) {
 #  This macro encodes HTML, EV3, and PGML special caracters using html codes
 #  This should be done for any variable which contains student input and is
 #  printed to a screen or interpreted by EV3.  
+# This is a function NOT a method.
 
 sub encode_pg_and_html {
     my $input = shift;

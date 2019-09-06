@@ -81,6 +81,7 @@ use File::Path;
 use File::Temp qw/tempdir/;
 
 
+
 our $UNIT_TESTS_ON =0;
 =item new
 	#The constructor is meant to be called with no parameters
@@ -103,6 +104,8 @@ sub new {
 			copy_command     => WeBWorK::PG::IO::copyCommand(),
 			rh_envir         => $rh_envir,   # pointer to the environment
 			displayMode      => $rh_envir->{displayMode},
+			hardcopy_errors  => [],
+			discard_working_directory =>1,
 			ext              => 'png',  # or svg or png or gif
 	};
 	return bless $self, $class;
@@ -191,10 +194,13 @@ sub render {
 		# print STDERR "result from render_tex_cmd  is $result  (256 is bad) command is $render_tex_cmd ";
 	};
 	if ($@) {
-		print STDERR "error in rendering tikz file with command $render_tex_cmd \n\n $@"
+		print STDERR "error in rendering tikz file with command $render_tex_cmd \n\n $@";
+		# read_log_file()
 	}
 	unless (-r "$working_dir/tikz_hardcopy.pdf" ) {
 		warn "file $working_dir/tikz_hardcopy.pdf was not created<br/>\n";
+		$self->read_log_file_for_errors();
+		# warn ($self->get_errors(), "\n");  #better left to the calling tikz.pl file?
 		return 0;
 	} else {
 		#warn "file $working_dir/hardcopy.pdf created<br/>\n";
@@ -211,7 +217,9 @@ sub render {
 			}
 		}
 	}
-	#$self->clean_up;
+	if ( $self->{discard_working_directory}) {
+		$self->clean_up;
+	}
 
 # here I'm assuming there's some file open which generates the HTML code for the
 # problem and its page, so render() should be called in the problem text portion
@@ -243,16 +251,57 @@ sub convert {
 #############
 
 
+#############
+# read log file for errors
+#############
+sub read_log_file_for_errors {
+	# read hardcopy.log and report first error
+	my $self = shift;
+	my $working_dir =  $self->{working_dir};
+	my $hardcopy_log = "$working_dir/tikz_hardcopy.log";
+	$self->{hardcopy_log} = $hardcopy_log;
+	#warn "reading $hardcopy_log";
+	#my $string = WeBWorK::PG::IO::read_whole_file($hardcopy_log);
+	#warn $$string;
+	if (-e $hardcopy_log) {
+ 		if (open my $LOG, "<:utf8", $hardcopy_log) {
+			my $line;
+			while ($line = <$LOG>) {
+				last if $line =~ /^!\s+/;
+			}
+			my $first_error = $line;
+			while ($line = <$LOG>) {
+				last if $line =~ /^!\s+/;
+				$first_error .= $line;
+			}
+			close $LOG;
+			#warn "first error is $first_error";
+			#warn "encode first error is ". (PGcore::encode_pg_and_html($first_error) );
+			if (defined $first_error) {
+				$self->add_errors("First error in TeX log is :</br>",
+					PGcore::encode_pg_and_html($first_error)       );
+			} else {
+				$self->add_errors("No errors encountered in TeX log.");
+			}
+		} else {
+			$self->add_errors("Could not read TeX log: ".( PGcore::encode_pg_and_html($!) ) );
+		}
+	} else {
+		$self->add_errors("No TeX log was found.");
+	}
+}
+
+
+
 sub clean_up {
 	my $self = shift;
 	my $working_dir =  $self->{working_dir};
-	my $file_name = $self->{file_name};
-	my $file_path = "$working_dir/$file_name";
-	if (-e "$file_path.tex") {
-		# warn "clean up rm -f $working_dir/*";
-		system "rm -f $working_dir/*";
+	if (-r $self->{final_destination_path}) {
+		warn "clean up rm -f $working_dir/*";
+		system "rm -rf $working_dir";
 	}
 }
+
 sub copy {
 	my $self = shift;
 	my $working_dir =  $self->{working_dir};
@@ -289,7 +338,7 @@ sub copy {
 
 
 ###### tempDirectory storage for tempDirectory since this inherits from PGcore
-###### 
+###### # need to fix this.
 sub tempDirectory {
 	my $self = shift;
 	$self->{working_dir};
@@ -299,12 +348,9 @@ sub tempDirectory {
 # This subroutine is being tested in pg/t/tikz_test4.pg
 sub create_working_directory {
 	my $self=shift();
-
-# we want to make the temp directory web-accessible, for error reporting
-	# use mkpath to ensure it exists (mkpath is pretty much ``mkdir -p'')"
-	
-	#my $temp_dir_parent_path = "tikz_hardcopy";
-	#warn "tempdirectory $temp_dir_parent_path";
+    # creates a directory of the form   courseTempDirectory/tikz_hardcopy/work.xxx/
+    # stores it in $self->{working_directory}
+    
 
 	# Make sure that the directory tmp/tikz_hardcopy exists where tmp
 	# is set as the tempDirectory for the current course. 
@@ -314,11 +360,13 @@ sub create_working_directory {
 	}
 	
 	# full path to the directory containing the work directory
+	# tmp/tikz_hardcopy/work.xxx/
 	my $temp_dir_parent_path = ($self->tempDirectory)."tikz_hardcopy";
 	
 	my $work_dir_path = File::Temp->newdir('work.XXXXX',
 	      DIR=> $temp_dir_parent_path,
-	      CLEANUP => 0);
+	      CLEANUP => 0,
+	);
 	      
 	# warn "working directory work_dir_path $work_dir_path";
 	
@@ -338,8 +386,8 @@ sub create_working_directory {
  		return;
  	}
  	$self->{working_dir} = $work_dir_path;
- 	my $tex_file_name = "hardcopy.tex";
- 	$self->{tex_file_name} = $tex_file_name;
+ 	#my $tex_file_name = "hardcopy.tex";
+ 	#$self->{tex_file_name} = $tex_file_name;
 # 	$self->{tex_file_path} = "$work_dir_path/$tex_file_name";
 # 	my $out = {
 # 		work_dir_path => $work_dir_path,
@@ -352,12 +400,12 @@ sub create_working_directory {
 
 sub add_errors {
 	my ($self, @errors) = @_;
-	push @{$self->{hardcopy_errors}}, @errors;
+	push @{ $self->{hardcopy_errors} }, @errors;
 }
 
 sub get_errors {
 	my ($self) = @_;
-	return $self->{hardcopy_errors} ? @{$self->{hardcopy_errors}} : ();
+	return ($self->{hardcopy_errors}) ? @{$self->{hardcopy_errors}} : ();
 }
 
 sub get_errors_ref {

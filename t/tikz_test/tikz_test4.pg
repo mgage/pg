@@ -98,8 +98,8 @@ sub tikz_graph{
 	unless( $drawing->render()) {
 		if ($drawing->get_errors() ){
 		
-			warn "Errors in TikZ code";
-			warning $drawing->get_errors;
+			warn "From .pg file-- errors in TikZ code ~~n";
+			warn $drawing->get_errors(), "~~n";
 		}
 		else {
 			warn "Something went wrong with the rendering";
@@ -120,7 +120,7 @@ $path = tikz_graph("
 \draw (1) -- (2) -- (3) -- (1); 
 \end{tikzpicture}
 \begin{tikzpicture}[main_node/.style={circle,fill=blue!20,draw,minimum size=1em,inner sep=3pt]}]
-\draw (-4,0) -- (4,0);
+\draw  (-4,0) -- (4,0);
 \draw (0,-2) -- (0,2);
 \draw (0,0) circle (1.5);
 \draw (0, 1.5) node[anchor=south]{N} -- (2.5,0)node [above]{y};
